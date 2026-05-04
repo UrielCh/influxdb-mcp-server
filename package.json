@@ -32,7 +32,7 @@
   },
   "homepage": "https://github.com/idoru/influxdb-mcp-server#readme",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.6.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^14.0.0",
     "zod": "^3.25.76"
   },

@@ -538,7 +538,6 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
       mcpClient = new McpClient({
         name: "test-client",
         version: "1.0.0",
-        timeout: 20000, // Even longer timeout for stability
       });
 
       // Monkey patch the client with our own isConnected property
