@@ -15,7 +15,16 @@ export async function createBucket({ name, orgID, retentionPeriodSeconds }: Crea
   console.log(`Creating bucket: ${name} for orgID: ${orgID}`);
 
   try {
-    const body: any = {
+    interface BucketRequestBody {
+      name: string;
+      orgID: string;
+      retentionRules?: Array<{
+        type: "expire";
+        everySeconds: number;
+      }>;
+    }
+
+    const body: BucketRequestBody = {
       name,
       orgID,
     };
@@ -33,7 +42,11 @@ export async function createBucket({ name, orgID, retentionPeriodSeconds }: Crea
     });
 
     console.log(`Create bucket response status: ${response.status}`);
-    const result = (await response.json()) as any;
+    interface CreateBucketResponse {
+      id: string;
+      name: string;
+    }
+    const result = (await response.json()) as CreateBucketResponse;
 
     console.log(`=== CREATE-BUCKET TOOL COMPLETED SUCCESSFULLY ===`);
     return {

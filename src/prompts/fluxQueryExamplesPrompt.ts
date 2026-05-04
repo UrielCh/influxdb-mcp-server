@@ -4,7 +4,7 @@
  * 
  * @returns An object containing the prompt messages with Flux query examples.
  */
-export async function fluxQueryExamplesPrompt(): Promise<{ messages: { role: "user"; content: { type: "text"; text: string } }[] }> {
+export async function fluxQueryExamplesPrompt(_args: Record<string, string | undefined>): Promise<{ messages: { role: "user"; content: { type: "text"; text: string } }[] }> {
   console.log(`=== FLUX-QUERY-EXAMPLES PROMPT CALLED ===`);
 
   const promptResponse = {

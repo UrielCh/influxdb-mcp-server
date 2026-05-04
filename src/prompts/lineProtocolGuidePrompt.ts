@@ -4,7 +4,7 @@
  * 
  * @returns An object containing the prompt messages with the Line Protocol guide.
  */
-export async function lineProtocolGuidePrompt(): Promise<{ messages: { role: "user"; content: { type: "text"; text: string } }[] }> {
+export async function lineProtocolGuidePrompt(_args: Record<string, string | undefined>): Promise<{ messages: { role: "user"; content: { type: "text"; text: string } }[] }> {
   console.log(`=== LINE-PROTOCOL-GUIDE PROMPT CALLED ===`);
 
   const promptResponse = {

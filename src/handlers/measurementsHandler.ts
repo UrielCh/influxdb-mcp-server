@@ -36,7 +36,11 @@ export function parseMeasurementsFromCsv(responseText: string): string[] {
  * Resource: Get Measurements in a Bucket
  * Returns a list of measurement names for a specific bucket.
  */
-export async function bucketMeasurements(uri: URL, { bucketName }: { bucketName: string }) {
+export async function bucketMeasurements(uri: URL, vars: Record<string, string | string[] | undefined>) {
+  const bucketName = vars.bucketName;
+  if (typeof bucketName !== "string") {
+    throw new Error("bucketName must be a string");
+  }
   console.log(
     `Processing measurements in bucket '${bucketName}' request - START`,
   );

@@ -4,7 +4,11 @@ import { influxRequest } from "../utils/influxClient";
  * Resource: Query data as a resource
  * Executes a Flux query and returns the results as a JSON resource.
  */
-export async function executeQuery(uri: URL, { orgName, fluxQuery }: { orgName: string, fluxQuery: string }) {
+export async function executeQuery(uri: URL, vars: Record<string, string | string[] | undefined>) {
+  const { orgName, fluxQuery } = vars;
+  if (typeof orgName !== "string" || typeof fluxQuery !== "string") {
+    throw new Error("orgName and fluxQuery must be strings");
+  }
   console.log(`=== QUERY RESOURCE CALLED ===`);
   console.log(`Query for org: ${orgName}, query length: ${fluxQuery.length}`);
 

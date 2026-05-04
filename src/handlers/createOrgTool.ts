@@ -20,7 +20,11 @@ export async function createOrg({ name, description }: CreateOrgArgs) {
     });
 
     console.log(`Create org response status: ${response.status}`);
-    const result = (await response.json()) as any;
+    interface CreateOrgResponse {
+      id: string;
+      name: string;
+    }
+    const result = (await response.json()) as CreateOrgResponse;
 
     console.log(`=== CREATE-ORG TOOL COMPLETED SUCCESSFULLY ===`);
     return {
