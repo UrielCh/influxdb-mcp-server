@@ -33,7 +33,7 @@ export async function createBucket({ name, orgID, retentionPeriodSeconds }: Crea
     });
 
     console.log(`Create bucket response status: ${response.status}`);
-    const result = await response.json();
+    const result = (await response.json()) as any;
 
     console.log(`=== CREATE-BUCKET TOOL COMPLETED SUCCESSFULLY ===`);
     return {

@@ -14,6 +14,51 @@ import waitForExpect from "wait-for-expect";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Interface definitions for type safety
+interface InfluxBucket {
+  name: string;
+  id?: string;
+  orgID: string;
+  retentionRules?: Array<{ type: string; everySeconds: number }>;
+}
+
+interface InfluxBucketsResponse {
+  buckets: InfluxBucket[];
+  error?: string;
+}
+
+interface InfluxOrg {
+  name: string;
+  id: string;
+}
+
+interface InfluxOrgsResponse {
+  orgs: InfluxOrg[];
+  error?: string;
+}
+
+interface McpContent {
+  text: string;
+  [key: string]: any;
+}
+
+interface McpResourceResponse {
+  contents: McpContent[];
+}
+
+interface McpToolResponse {
+  content?: McpContent[];
+  result?: string;
+  error?: any;
+  [key: string]: any;
+}
+
+interface SpawnResult {
+  stdout: string;
+  stderr: string;
+  code: number | null;
+}
+
 // Generate a random port between 10000 and 20000 to avoid conflicts
 const getRandomPort = () => Math.floor(Math.random() * 10000) + 10000;
 
@@ -33,12 +78,12 @@ const INFLUXDB_PASSWORD = "adminpassword";
 // This test suite focuses only on direct InfluxDB API testing without using MCP
 // This approach isolates the InfluxDB functionality from MCP client connectivity issues
 describe("InfluxDB MCP Server Integration Tests", () => {
-  let docker;
-  let container;
+  let docker: any;
+  let container: any;
   // We won't use these for direct testing
-  let mcpServerProcess = null;
-  let mcpClient = null;
-  let mcpServerEnv = null;
+  let mcpServerProcess: any = null;
+  let mcpClient: any = null;
+  let mcpServerEnv: any = null;
 
   // Setup: Start InfluxDB container before all tests
   beforeAll(async () => {
@@ -47,15 +92,16 @@ describe("InfluxDB MCP Server Integration Tests", () => {
 
     console.log("Pulling InfluxDB image...");
     await new Promise((resolve, reject) => {
-      docker.pull("influxdb:2.7", (err, stream) => {
+      docker.pull("influxdb:2.7", (err: any, stream: any) => {
         if (err) {
           return reject(err);
         }
-        docker.modem.followProgress(stream, (err) => {
+        docker.modem.followProgress(stream, (err: any) => {
           if (err) {
-            return reject(err);
+            reject(err);
+          } else {
+            resolve(undefined);
           }
-          resolve();
         });
       });
     });
@@ -126,12 +172,12 @@ describe("InfluxDB MCP Server Integration Tests", () => {
       if (mcpClient) {
         try {
           console.log("Closing MCP client...");
-          await mcpClient.close().catch((e) =>
+          await mcpClient.close().catch((e: Error) =>
             console.error("Error closing MCP client:", e.message)
           );
           mcpClient = null;
           console.log("MCP client closed successfully");
-        } catch (e) {
+        } catch (e: any) {
           console.error("Failed to close MCP client:", e.message);
         }
       }
@@ -171,7 +217,7 @@ describe("InfluxDB MCP Server Integration Tests", () => {
           await new Promise((resolve) => setTimeout(resolve, 500));
           mcpServerProcess = null;
           console.log("MCP server process killed successfully");
-        } catch (e) {
+        } catch (e: any) {
           console.error("Failed to kill MCP server process:", e.message);
         }
       }
@@ -193,7 +239,7 @@ describe("InfluxDB MCP Server Integration Tests", () => {
             console.log("Container may already be removed")
           );
           console.log("InfluxDB container stopped and removed");
-        } catch (containerError) {
+        } catch (containerError: any) {
           console.error(
             "Error stopping/removing container:",
             containerError.message,
@@ -221,7 +267,7 @@ describe("InfluxDB MCP Server Integration Tests", () => {
                 console.log(
                   `Successfully removed container ${containerInfo.Id}`,
                 );
-              } catch (err) {
+              } catch (err: any) {
                 console.error(
                   `Failed to remove container ${containerInfo.Id}:`,
                   err.message,
@@ -235,7 +281,7 @@ describe("InfluxDB MCP Server Integration Tests", () => {
 
         // Wait for all cleanup operations to finish
         await Promise.allSettled(cleanupPromises);
-      } catch (cleanupError) {
+      } catch (cleanupError: any) {
         console.error("Error during extra cleanup:", cleanupError.message);
       }
 
@@ -254,18 +300,18 @@ describe("InfluxDB MCP Server Integration Tests", () => {
             } else {
               console.log("Process cleanup completed");
             }
-            resolve();
+            resolve(undefined);
           });
 
           // Set a timeout just in case
           setTimeout(resolve, 1000);
         });
-      } catch (e) {
+      } catch (e: any) {
         console.error("Error killing lingering processes:", e.message);
       }
 
       console.log("Cleanup completed successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error during test cleanup:", error.message);
     } finally {
       // Reset the cleanup flag
@@ -284,20 +330,21 @@ describe("InfluxDB MCP Server Integration Tests", () => {
     while (!ready && attempts < maxAttempts) {
       attempts++;
       try {
-        const response = await fetch(
+        const healthResponse = await fetch(
           `http://localhost:${INFLUXDB_PORT}/health`,
         );
-        const data = await response.json();
+        const data = (await healthResponse.json()) as any;
         if (data.status === "pass") {
           ready = true;
-          console.log("InfluxDB is ready!");
+          console.log("InfluxDB is ready");
+          break;
         } else {
           console.log(
             `Waiting for InfluxDB to be ready... Attempt ${attempts}/${maxAttempts}`,
           );
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
-      } catch (error) {
+      } catch (error: any) {
         console.log(
           `Waiting for InfluxDB to start... Attempt ${attempts}/${maxAttempts}. Error: ${error.message}`,
         );
@@ -317,20 +364,16 @@ describe("InfluxDB MCP Server Integration Tests", () => {
     console.log("Creating InfluxDB token for MCP server...");
 
     // First, get the org ID
-    const orgResponse = await fetch(
-      `http://localhost:${INFLUXDB_PORT}/api/v2/orgs?org=${INFLUXDB_ORG}`,
-      {
-        method: "GET",
-        headers: {
-          "Authorization": `Token ${INFLUXDB_ADMIN_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-      },
-    );
+    const orgUrl = `http://localhost:${INFLUXDB_PORT}/api/v2/orgs?org=${INFLUXDB_ORG}`;
+    const headers = {
+      "Authorization": `Token ${INFLUXDB_ADMIN_TOKEN}`,
+      "Content-Type": "application/json",
+    };
+    const orgResponse = await fetch(orgUrl, { headers });
+    const orgData = (await orgResponse.json()) as any;
 
-    const orgData = await orgResponse.json();
     if (!orgData.orgs || orgData.orgs.length === 0) {
-      throw new Error("Organization not found");
+      throw new Error(`Organization ${INFLUXDB_ORG} not found`);
     }
 
     const orgID = orgData.orgs[0].id;
@@ -382,7 +425,7 @@ describe("InfluxDB MCP Server Integration Tests", () => {
       },
     );
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = (await tokenResponse.json()) as any;
     console.log("Token created:", tokenData.token ? "success" : "failure");
   }
 
@@ -417,7 +460,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
 
       console.log("Sample data written successfully");
       return response;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error writing sample data:", error.message);
       throw error;
     }
@@ -511,7 +554,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
       // Add debugging to client's protocol layer if possible
       if (mcpClient.connect.toString().includes("super.connect")) {
         const originalConnect = mcpClient.connect;
-        mcpClient.connect = async function (transport) {
+        mcpClient.connect = async function (transport: any) {
           console.log("[CLIENT-DEBUG] connect() called");
           try {
             const result = await originalConnect.call(this, transport);
@@ -526,7 +569,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
         // Enhance request method if available
         if (mcpClient.request) {
           const originalRequest = mcpClient.request;
-          mcpClient.request = async function (request, schema) {
+          mcpClient.request = async function (request: any, schema: any) {
             console.log("[CLIENT-DEBUG] request:", JSON.stringify(request));
             try {
               const result = await originalRequest.call(this, request, schema);
@@ -548,34 +591,35 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
         };
 
         // Add onerror callback for debugging
-        mcpClient.onerror = (err) => {
+        mcpClient.onerror = (err: any) => {
           console.error("[CLIENT-DEBUG] Protocol error:", err);
         };
       }
 
       // Create the transport first (it will spawn the server process)
       const transport = new StdioClientTransport({
-        command:  process.execPath,
-        args: [path.join(__dirname, "../src/index.ts")],
-        env: serverEnv,
-        stderr: "pipe", // Capture stderr for logging
-        stdout: "pipe", // Also capture stdout
-        debugEnabled: true, // Enable transport debugging
-      });
-
+        command: "bun",
+        args: ["src/index.ts", "--stdio"],
+        env: mcpServerEnv,
+        stdout: "pipe",
+        stderr: "pipe",
+      } as any);
+      
       // Add more transport level debugging
-      if (transport._send) {
-        const originalSend = transport._send;
-        transport._send = function (data) {
+      (transport as any).debugEnabled = true;
+
+      if ((transport as any)._send) {
+        const originalSend = (transport as any)._send;
+        (transport as any)._send = function (data: any) {
           console.log("[TRANSPORT-DEBUG] SENDING:", JSON.stringify(data));
           return originalSend.call(this, data);
         };
       }
 
       // Add receive debugging
-      if (transport._receive) {
-        const originalReceive = transport._receive;
-        transport._receive = function (data) {
+      if ((transport as any)._receive) {
+        const originalReceive = (transport as any)._receive;
+        (transport as any)._receive = function (data: any) {
           console.log("[TRANSPORT-DEBUG] RECEIVED:", JSON.stringify(data));
           return originalReceive.call(this, data);
         };
@@ -614,13 +658,16 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
           capabilities: Object.keys(serverCaps || {}),
           isConnected: mcpClient.isConnected,
         });
-      } catch (connError) {
+      } catch (connError: any) {
         console.error("MCP client connect() failed:", connError.message);
 
         // Try to get stderr output to help diagnose the issue
-        if (transport._process && transport._process.stderr) {
-          const stderrChunks = [];
-          transport._process.stderr.on("data", (chunk) => {
+        // Add a delay to allow stderr to be captured
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        if ((transport as any)._process && (transport as any)._process.stderr) {
+          const stderrChunks: any[] = [];
+          (transport as any)._process.stderr.on("data", (chunk: any) => {
             stderrChunks.push(chunk);
           });
 
@@ -642,8 +689,8 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
       console.log("Waiting for server process to initialize...");
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
-      // Get a reference to the spawned process from the transport
-      mcpServerProcess = transport._process;
+      // Store the server process for cleanup
+      mcpServerProcess = (transport as any)._process;
 
       if (mcpServerProcess) {
         // Set up extensive logging
@@ -652,7 +699,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
         // Log MCP server output to help debug communication issues
         if (mcpServerProcess.stderr) {
           // Use named function so we can remove it later
-          const stderrHandler = (data) => {
+          const stderrHandler = (data: any) => {
             // Only log if we're not in cleanup mode
             if (!globalThis.testCleanupInProgress) {
               console.error(`Server stderr: ${data.toString().trim()}`);
@@ -666,7 +713,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
 
         if (mcpServerProcess.stdout) {
           // Use named function so we can remove it later
-          const stdoutHandler = (data) => {
+          const stdoutHandler = (data: any) => {
             // Only log if we're not in cleanup mode
             if (!globalThis.testCleanupInProgress) {
               console.log(`Server stdout: ${data.toString().trim()}`);
@@ -679,7 +726,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
         }
 
         // Check for process exit
-        mcpServerProcess.on("exit", (code) => {
+        mcpServerProcess.on("exit", (code: any) => {
           console.log(`Server process exited with code ${code}`);
         });
       } else {
@@ -746,11 +793,11 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
           if (!mcpClient.resource) {
             console.log("Adding missing resource property");
             mcpClient.resource = {
-              get: async (uri) => {
+              get: async (uri: string) => {
                 console.log(`Calling resource.get with URI: ${uri}`);
                 return mcpClient.readResource({ uri });
               },
-              list: async (uri) => {
+              list: async (uri: string) => {
                 console.log(`Calling resource.list with URI: ${uri}`);
                 return mcpClient.listResources({ uri });
               },
@@ -760,7 +807,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
           if (!mcpClient.tool) {
             console.log("Adding missing tool property");
             mcpClient.tool = {
-              invoke: async (name, params) => {
+              invoke: async (name: string, params: any) => {
                 console.log(`Calling tool.invoke for tool ${name}`);
                 return mcpClient.callTool({ name, arguments: params });
               },
@@ -770,7 +817,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
 
         // Set a session flag indicating we have a verified connection
         mcpClient._connectionVerified = true;
-      } catch (connectionError) {
+      } catch (connectionError: any) {
         console.error(
           "Connection verification failed:",
           connectionError.message,
@@ -786,11 +833,11 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
           if (!mcpClient.resource) {
             console.log("Adding missing resource property during fallback");
             mcpClient.resource = {
-              get: async (uri) => {
+              get: async (uri: string) => {
                 console.log(`Calling resource.get with URI: ${uri}`);
                 return mcpClient.readResource({ uri });
               },
-              list: async (uri) => {
+              list: async (uri: string) => {
                 console.log(`Calling resource.list with URI: ${uri}`);
                 return mcpClient.listResources({ uri });
               },
@@ -800,7 +847,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
           if (!mcpClient.tool) {
             console.log("Adding missing tool property during fallback");
             mcpClient.tool = {
-              invoke: async (name, params) => {
+              invoke: async (name: string, params: any) => {
                 console.log(`Calling tool.invoke for tool ${name}`);
                 return mcpClient.callTool({ name, arguments: params });
               },
@@ -815,10 +862,13 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
         }
       }
 
-      console.log("MCP client initialized successfully");
+      console.log("Successfully connected to MCP server via STDIO");
       return mcpClient;
-    } catch (error) {
-      console.error("Failed to initialize MCP client:", error.message);
+    } catch (error: any) {
+      console.error(
+        "Failed to initialize MCP client via STDIO transport:",
+        error.message,
+      );
       throw error;
     }
   }
@@ -863,12 +913,12 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
   });
 
   // Helper function to wrap MCP client calls with timeout and retry
-  async function withTimeout(
-    promise,
+  async function withTimeout<T>(
+    promise: Promise<T>,
     timeoutMs = 10000, // Increase default timeout to 10 seconds for better stability
     operationName = "operation",
     retries = 3, // Increase retry count
-  ) {
+  ): Promise<T> {
     let lastError;
 
     // Examine if our client is actually connected
@@ -911,7 +961,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
             if (!mcpClient || !mcpClient._connectionVerified) {
               throw new Error("Failed to establish a verified connection");
             }
-          } catch (e) {
+          } catch (e: any) {
             console.error("Failed to reconnect client:", e.message);
             // Wait a bit longer before continuing with the attempt
             await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -955,7 +1005,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
               reject(err);
             });
         });
-      } catch (error) {
+      } catch (error: any) {
         lastError = error;
         console.log(
           `${operationName} attempt ${attempt + 1}/${
@@ -1013,7 +1063,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
       console.log(`Response status: ${response.status}`);
       expect(response.status).toBe(200);
 
-      const data = await response.json();
+      const data = (await response.json()) as InfluxOrgsResponse;
 
       // Validate response
       expect(data).toBeDefined();
@@ -1025,12 +1075,12 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
       // Save the orgs for comparison
       console.log(
         `Found orgs via direct API: ${
-          data.orgs.map((org) => org.name).join(", ")
+          data.orgs.map((org: InfluxOrg) => org.name).join(", ")
         }`,
       );
 
       console.log("Organization listing test completed successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Organization test failed:", error.message);
       throw error;
     }
@@ -1053,10 +1103,10 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
 
     // Use withTimeout to handle potential timeouts
     const response = await withTimeout(
-      client.resource.get(resourceUri),
+      (client as any).resource.get(resourceUri),
       10000,
       "List organizations via MCP",
-    );
+    ) as McpResourceResponse;
 
     console.log("MCP server response received for organizations");
 
@@ -1067,10 +1117,10 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
     expect(response.contents[0].text).toBeDefined();
 
     // Parse the JSON string
-    const orgsData = JSON.parse(response.contents[0].text);
+    const orgsData = JSON.parse(response.contents[0].text) as InfluxOrgsResponse;
     console.log(
       `Found orgs via MCP client: ${
-        orgsData.orgs?.map((org) => org.name).join(", ") || "none"
+        orgsData.orgs?.map((org: InfluxOrg) => org.name).join(", ") || "none"
       }`,
     );
 
@@ -1084,7 +1134,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
     expect(orgsData.orgs.length).toBeGreaterThan(0);
 
     // Compare with the test org
-    const containsTestOrg = orgsData.orgs.some((org) =>
+    const containsTestOrg = orgsData.orgs.some((org: InfluxOrg) =>
       org.name === INFLUXDB_ORG
     );
     expect(containsTestOrg).toBe(true);
@@ -1113,7 +1163,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
       console.log(`Response status: ${response.status}`);
       expect(response.status).toBe(200);
 
-      const data = await response.json();
+      const data = (await response.json()) as InfluxBucketsResponse;
 
       // Validate response
       expect(data).toBeDefined();
@@ -1122,19 +1172,19 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
       expect(data.buckets.length).toBeGreaterThan(0);
 
       // Check if our test bucket is in the list
-      const foundBucket = data.buckets.some((bucket) =>
+      const foundBucket = data.buckets.some((bucket: InfluxBucket) =>
         bucket.name === INFLUXDB_BUCKET
       );
       expect(foundBucket).toBe(true);
 
       // Log the buckets and their org IDs
       console.log("Buckets found via direct API:");
-      data.buckets.forEach((bucket) => {
+      data.buckets.forEach((bucket: InfluxBucket) => {
         console.log(`- Name: ${bucket.name}, OrgID: ${bucket.orgID}`);
       });
 
       console.log("Bucket listing test completed successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Bucket test failed:", error.message);
       throw error;
     }
@@ -1154,10 +1204,10 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
 
     // Use withTimeout to handle potential timeouts
     const response = await withTimeout(
-      client.resource.get(resourceUri),
+      (client as any).resource.get(resourceUri),
       10000,
       "List buckets via MCP",
-    );
+    ) as McpResourceResponse;
 
     console.log("MCP server response received for buckets");
 
@@ -1168,11 +1218,11 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
     expect(response.contents[0].text).toBeDefined();
 
     // Parse the JSON string
-    const bucketsData = JSON.parse(response.contents[0].text);
+    const bucketsData = JSON.parse(response.contents[0].text) as InfluxBucketsResponse;
 
     // Validate the response
     expect(bucketsData).toBeDefined();
-    expect(bucketsData.error).toBeUndefined(); // No error should be present
+    expect((bucketsData as any).error).toBeUndefined(); // No error should be present
     expect(bucketsData.buckets).toBeDefined();
     expect(Array.isArray(bucketsData.buckets)).toBe(true);
 
@@ -1181,12 +1231,12 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
 
     // Log the buckets and their org IDs
     console.log("Buckets found via MCP client:");
-    bucketsData.buckets.forEach((bucket) => {
+    bucketsData.buckets.forEach((bucket: InfluxBucket) => {
       console.log(`- Name: ${bucket.name}, OrgID: ${bucket.orgID}`);
     });
 
     // Check if our test bucket is in the list
-    const foundBucket = bucketsData.buckets.some((bucket) =>
+    const foundBucket = bucketsData.buckets.some((bucket: InfluxBucket) =>
       bucket.name === INFLUXDB_BUCKET
     );
     expect(foundBucket).toBe(true);
@@ -1233,7 +1283,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       expect(responseText).toContain("cpu_usage");
 
       console.log("Measurements listing test completed successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Measurements test failed:", error.message);
       throw error;
     }
@@ -1260,10 +1310,10 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
 
     // Use withTimeout to handle potential timeouts
     const response = await withTimeout(
-      client.resource.get(resourceUri),
+      (client as any).resource.get(resourceUri),
       10000,
       "List measurements via MCP",
-    );
+    ) as McpResourceResponse;
 
     console.log("MCP server response received for measurements");
     console.log("Raw response:", JSON.stringify(response));
@@ -1287,7 +1337,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
     // Verify we have measurements (including the ones we just wrote)
     // In case we get a different response structure, handle that
     // Use the measurements from the data structure or fallback
-    let measurements = [];
+    let measurements: string[] = [];
     if (
       measurementsData.measurements &&
       Array.isArray(measurementsData.measurements)
@@ -1355,7 +1405,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
     expect(foundCpuUsage).toBe(true);
 
     console.log("MCP client measurements listing test completed successfully");
-  });
+  }, 30000);
 
   // Test: Direct server communication approach for write-data tool
   test("should write data using direct communication", async () => {
@@ -1439,7 +1489,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       serverProcess.kill();
 
       console.log("Direct communication test completed successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Direct communication test failed:", error.message);
       throw error;
     }
@@ -1465,7 +1515,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
 
     // Use withTimeout to handle potential timeouts with the tool
     const toolResponse = await withTimeout(
-      client.tool.invoke("write-data", {
+      (client as any).tool.invoke("write-data", {
         org: INFLUXDB_ORG,
         bucket: INFLUXDB_BUCKET,
         data: lineProtocol,
@@ -1473,7 +1523,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       }),
       10000,
       "Invoke write-data tool via MCP",
-    );
+    ) as McpToolResponse;
 
     console.log("MCP tool response received for write-data");
 
@@ -1519,7 +1569,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
     expect(responseText).toContain("connections");
 
     console.log("MCP client write-data tool test completed successfully");
-  });
+  }, 30000);
 
   // Test: Query data using direct API
   test("should query data using Flux - direct API", async () => {
@@ -1564,7 +1614,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       expect(responseText).toContain("server01"); // From our sample data
 
       console.log("Flux query test completed successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Flux query test failed:", error.message);
       throw error;
     }
@@ -1591,18 +1641,18 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
     console.log("Invoking query-data tool via MCP client...");
 
     // Use withTimeout to handle potential timeouts with the tool
-    let toolResponse;
+    let toolResponse: McpToolResponse;
 
     try {
       // Try the standard way first
       toolResponse = await withTimeout(
-        client.tool.invoke("query-data", {
+        (client as any).tool.invoke("query-data", {
           org: INFLUXDB_ORG,
           query: fluxQuery,
         }),
         10000,
         "Invoke query-data tool via MCP",
-      );
+      ) as McpToolResponse;
 
       console.log("MCP tool response received for query-data");
       console.log("Raw tool response:", JSON.stringify(toolResponse));
@@ -1629,7 +1679,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       } else {
         throw new Error("Unexpected tool response format");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.log(
         "Error using tool.invoke, falling back to direct API:",
         error.message,
@@ -1686,7 +1736,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       });
 
       expect(orgsResponse.ok).toBe(true);
-      const orgsData = await orgsResponse.json();
+      const orgsData = (await orgsResponse.json()) as InfluxOrgsResponse;
       expect(orgsData.orgs).toHaveLength(1);
 
       const orgID = orgsData.orgs[0].id;
@@ -1716,7 +1766,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       });
 
       expect(createResponse.ok).toBe(true);
-      const bucket = await createResponse.json();
+      const bucket = (await createResponse.json()) as InfluxBucket;
 
       expect(bucket.name).toBe(newBucketName);
       expect(bucket.orgID).toBe(orgID);
@@ -1733,13 +1783,13 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       });
 
       expect(listResponse.ok).toBe(true);
-      const buckets = await listResponse.json();
+      const buckets = (await listResponse.json()) as InfluxBucketsResponse;
 
-      const foundBucket = buckets.buckets.some((b) => b.name === newBucketName);
+      const foundBucket = buckets.buckets.some((b: InfluxBucket) => b.name === newBucketName);
       expect(foundBucket).toBe(true);
 
       console.log("Direct API bucket creation test completed successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Bucket creation test failed:", error.message);
       throw error;
     }
@@ -1766,7 +1816,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       });
 
       expect(orgsResponse.ok).toBe(true);
-      const orgsData = await orgsResponse.json();
+      const orgsData = (await orgsResponse.json()) as InfluxOrgsResponse;
       expect(orgsData.orgs).toHaveLength(1);
 
       const orgID = orgsData.orgs[0].id;
@@ -1783,7 +1833,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       console.log("Invoking create-bucket tool via MCP client...");
 
       // Use withTimeout to handle potential timeouts with the tool
-      let toolResponse;
+      let toolResponse: McpToolResponse;
 
       try {
         toolResponse = await withTimeout(
@@ -1825,7 +1875,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
         } else {
           throw new Error("Unexpected tool response format");
         }
-      } catch (error) {
+      } catch (error: any) {
         console.log(
           "Error using tool.invoke for create-bucket, falling back to direct API:",
           error.message,
@@ -1865,13 +1915,13 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
           },
           body: JSON.stringify(bucketData),
           signal: AbortSignal.timeout(5000),
-        }).catch((err) => {
+        }).catch((err: any) => {
           console.log(
             "Note: Final bucket creation attempt failed, but test can still pass:",
             err.message,
           );
         });
-      } catch (err) {
+      } catch (err: any) {
         console.log("Final create bucket fallback failed:", err.message);
       }
 
@@ -1887,17 +1937,17 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       });
 
       expect(listResponse.ok).toBe(true);
-      const buckets = await listResponse.json();
+      const buckets = (await listResponse.json()) as InfluxBucketsResponse;
 
       // Check if our bucket was created by any of the methods we tried
-      const foundBucket = buckets.buckets.some((b) => b.name === newBucketName);
+      const foundBucket = buckets.buckets.some((b: InfluxBucket) => b.name === newBucketName);
 
       // If we didn't find the bucket, log all bucket names for debugging
       if (!foundBucket) {
         console.log(
           "Could not find the expected bucket in the list. Available buckets:",
         );
-        buckets.buckets.forEach((b) => console.log(` - ${b.name}`));
+        buckets.buckets.forEach((b: InfluxBucket) => console.log(` - ${b.name}`));
 
         // For the test to pass regardless, just skip the assertion
         console.log("Test will pass despite bucket creation issue");
@@ -1908,7 +1958,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       expect(foundBucket).toBe(true);
 
       console.log("MCP client create-bucket tool test completed successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("MCP bucket creation test failed:", error.message);
       throw error;
     }
@@ -1956,7 +2006,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       expect(responseText).toContain("server01");
 
       console.log("Query resource test completed successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Query resource test failed:", error.message);
       throw error;
     }
@@ -2008,7 +2058,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       await fs.promises.writeFile(tempScriptPath, testScript);
 
       // Execute the script
-      const { stdout, stderr } = await new Promise((resolve, reject) => {
+      const { stdout, stderr } = await new Promise<SpawnResult>((resolve, reject) => {
         const child = spawn( process.execPath, [tempScriptPath], {
           env: process.env,
         });
@@ -2038,7 +2088,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       expect(result.hasExampleContent).toBe(true);
 
       console.log("Flux query examples prompt test completed successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Flux query examples prompt test failed:", error.message);
       throw error;
     }
@@ -2061,7 +2111,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       });
 
       expect(orgsResponse.status).toBe(200);
-      const orgsData = await orgsResponse.json();
+      const orgsData = (await orgsResponse.json()) as InfluxOrgsResponse;
 
       // Get buckets via direct API
       const bucketsUrl = `http://localhost:${INFLUXDB_PORT}/api/v2/buckets`;
@@ -2075,20 +2125,20 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       });
 
       expect(bucketsResponse.status).toBe(200);
-      const bucketsData = await bucketsResponse.json();
+      const bucketsData = (await bucketsResponse.json()) as InfluxBucketsResponse;
 
       // Extract all unique org IDs from buckets
       const bucketOrgIds = [
-        ...new Set(bucketsData.buckets.map((bucket) => bucket.orgID)),
+        ...new Set(bucketsData.buckets.map((bucket: InfluxBucket) => bucket.orgID)),
       ];
       console.log("Unique org IDs found in buckets:", bucketOrgIds);
 
       // Extract all org IDs from orgs
-      const orgIds = orgsData.orgs.map((org) => org.id);
+      const orgIds = orgsData.orgs.map((org: InfluxOrg) => org.id);
       console.log("Org IDs found in organizations:", orgIds);
 
       // Check if all bucket org IDs exist in the orgs list
-      const missingOrgIds = bucketOrgIds.filter((orgId) =>
+      const missingOrgIds = bucketOrgIds.filter((orgId: string) =>
         !orgIds.includes(orgId)
       );
 
@@ -2099,13 +2149,13 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
         );
 
         // For each missing org ID, log the buckets that use it
-        missingOrgIds.forEach((orgId) => {
-          const bucketsWithMissingOrg = bucketsData.buckets.filter((bucket) =>
+        missingOrgIds.forEach((orgId: string) => {
+          const bucketsWithMissingOrg = bucketsData.buckets.filter((bucket: InfluxBucket) =>
             bucket.orgID === orgId
           );
           console.log(
             `Buckets with missing org ID ${orgId}:`,
-            bucketsWithMissingOrg.map((b) => `${b.name} (ID: ${b.id})`),
+            bucketsWithMissingOrg.map((b: InfluxBucket) => `${b.name} (ID: ${b.id})`),
           );
         });
       } else {
@@ -2122,19 +2172,19 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
 
         console.log("Requesting organizations from MCP server...");
         const mcpResponse = await withTimeout(
-          client.resource.get("influxdb://orgs"),
+          (client as any).resource.get("influxdb://orgs"),
           10000,
           "List organizations via MCP for comparison",
-        );
+        ) as McpResourceResponse;
 
-        const mcpOrgsData = JSON.parse(mcpResponse.contents[0].text);
-        const mcpOrgIds = mcpOrgsData.orgs.map((org) => org.id);
+        const mcpOrgsData = JSON.parse(mcpResponse.contents[0].text) as InfluxOrgsResponse;
+        const mcpOrgIds = mcpOrgsData.orgs.map((org: InfluxOrg) => org.id);
         console.log("Org IDs found via MCP client:", mcpOrgIds);
 
         // Compare direct API and MCP results
-        const orgIdsDiff = orgIds.filter((id) => !mcpOrgIds.includes(id))
+        const orgIdsDiff = orgIds.filter((id: string) => !mcpOrgIds.includes(id))
           .concat(
-            mcpOrgIds.filter((id) => !orgIds.includes(id)),
+            mcpOrgIds.filter((id: string) => !orgIds.includes(id)),
           );
 
         if (orgIdsDiff.length > 0) {
@@ -2145,7 +2195,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
         } else {
           console.log("Direct API and MCP client return the same org IDs");
         }
-      } catch (mcpError) {
+      } catch (mcpError: any) {
         console.error("MCP client approach failed:", mcpError.message);
 
         // Fall back to direct handler approach
@@ -2169,13 +2219,13 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
           console.log("Error in handler response:", handlerOrgsData.error);
           // We'll consider the test passed even with an error
         } else {
-          const handlerOrgIds = handlerOrgsData.orgs.map((org) => org.id);
+          const handlerOrgIds = handlerOrgsData.orgs.map((org: InfluxOrg) => org.id);
           console.log("Org IDs found via handler:", handlerOrgIds);
 
           // Compare direct API and handler results
-          const orgIdsDiff = orgIds.filter((id) => !handlerOrgIds.includes(id))
+          const orgIdsDiff = orgIds.filter((id: string) => !handlerOrgIds.includes(id))
             .concat(
-              handlerOrgIds.filter((id) => !orgIds.includes(id)),
+              handlerOrgIds.filter((id: string) => !orgIds.includes(id)),
             );
 
           if (orgIdsDiff.length > 0) {
@@ -2188,7 +2238,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
           }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Consistency test failed:", error.message);
       throw error;
     }
@@ -2240,7 +2290,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       await fs.promises.writeFile(tempScriptPath, testScript);
 
       // Execute the script
-      const { stdout, stderr } = await new Promise((resolve, reject) => {
+      const { stdout, stderr } = await new Promise<SpawnResult>((resolve, reject) => {
         const child = spawn( process.execPath, [tempScriptPath], {
           env: process.env,
         });
@@ -2270,7 +2320,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       expect(result.hasContent).toBe(true);
 
       console.log("Line protocol guide prompt test completed successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Line protocol guide prompt test failed:", error.message);
       throw error;
     }

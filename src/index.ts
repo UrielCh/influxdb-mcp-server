@@ -58,26 +58,25 @@ const createMcpServer = () => {
   });
 
   // Register resources
-  server.resource("orgs", "influxdb://orgs", listOrganizations);
-  server.resource("buckets", "influxdb://buckets", listBuckets);
-  server.resource(
+  (server as any).resource("orgs", "influxdb://orgs", listOrganizations);
+  (server as any).resource("buckets", "influxdb://buckets", listBuckets);
+  (server as any).resource(
     "bucket-measurements",
     new ResourceTemplate("influxdb://bucket/{bucketName}/measurements", {
-      bucketName: z.string().describe("The name of the bucket"),
+      list: undefined,
     }),
     bucketMeasurements as any,
   );
-  server.resource(
+  (server as any).resource(
     "query",
     new ResourceTemplate("influxdb://query/{orgName}/{fluxQuery}", {
-      orgName: z.string().describe("The organization name"),
-      fluxQuery: z.string().describe("URL-encoded Flux query"),
+      list: undefined,
     }),
     executeQuery as any,
   );
 
   // Register tools
-  server.tool(
+  (server as any).tool(
     "write-data",
     "Stream newline-delimited line protocol records into a bucket. Use this after composing measurements so the LLM can insert real telemetry, optionally controlling timestamp precision.",
     {
@@ -105,7 +104,7 @@ const createMcpServer = () => {
     },
     writeData as any,
   );
-  server.tool(
+  (server as any).tool(
     "query-data",
     "Execute a Flux query inside an organization to inspect measurement schemas, run aggregations, or validate recently written data.",
     {
@@ -122,7 +121,7 @@ const createMcpServer = () => {
     },
     queryData as any,
   );
-  server.tool(
+  (server as any).tool(
     "create-bucket",
     "Provision a new bucket under an organization so that subsequent write-data calls have a destination.",
     {
@@ -145,7 +144,7 @@ const createMcpServer = () => {
     },
     createBucket as any,
   );
-  server.tool(
+  (server as any).tool(
     "create-org",
     "Create a brand-new organization to isolate users or projects before generating buckets and tokens.",
     {
