@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { JSONRPCMessage, CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -109,7 +110,7 @@ const createMcpServer = () => {
   );
 
   // Register tools
-  server.registerTool<any, any>(
+  server.registerTool(
     "write-data",
     {
       description: "Stream newline-delimited line protocol records into a bucket. Use this after composing measurements so the LLM can insert real telemetry, optionally controlling timestamp precision.",
@@ -135,11 +136,11 @@ const createMcpServer = () => {
           .describe(
             "Optional timestamp precision. Provide it only when the line protocol omits unit suffix context; defaults to nanoseconds.",
           ),
-      },
+      } as unknown as ZodRawShapeCompat,
     },
-    writeData,
+    (args) => writeData(args as unknown as Parameters<typeof writeData>[0]),
   );
-  server.registerTool<any, any>(
+  server.registerTool(
     "query-data",
     {
       description: "Execute a Flux query inside an organization to inspect measurement schemas, run aggregations, or validate recently written data.",
@@ -154,11 +155,11 @@ const createMcpServer = () => {
           .describe(
             "Flux query text. Multi-line strings are supported; results are returned as annotated CSV for easy parsing.",
           ),
-      },
+      } as unknown as ZodRawShapeCompat,
     },
-    queryData,
+    (args) => queryData(args as unknown as Parameters<typeof queryData>[0]),
   );
-  server.registerTool<any, any>(
+  server.registerTool(
     "create-bucket",
     {
       description: "Provision a new bucket under an organization so that subsequent write-data calls have a destination.",
@@ -179,11 +180,11 @@ const createMcpServer = () => {
           .describe(
             "Optional retention duration expressed in seconds. Omit for infinite retention.",
           ),
-      },
+      } as unknown as ZodRawShapeCompat,
     },
-    createBucket,
+    (args) => createBucket(args as unknown as Parameters<typeof createBucket>[0]),
   );
-  server.registerTool<any, any>(
+  server.registerTool(
     "create-org",
     {
       description: "Create a brand-new organization to isolate users or projects before generating buckets and tokens.",
@@ -199,9 +200,9 @@ const createMcpServer = () => {
           .describe(
             "Optional free-form description that helps humans understand why the org exists.",
           ),
-      },
+      } as unknown as ZodRawShapeCompat,
     },
-    createOrg,
+    (args) => createOrg(args as unknown as Parameters<typeof createOrg>[0]),
   );
 
   // Register prompts
