@@ -1,5 +1,36 @@
-import { influxRequest } from "../utils/influxClient";
 import { DEFAULT_ORG } from "../config/env";
+import { influxRequest } from "../utils/influxClient";
+
+/**
+ * Parses Flux CSV response to extract measurement names
+ * @param responseText The raw CSV response from InfluxDB
+ * @returns Array of measurement names
+ */
+export function parseMeasurementsFromCsv(responseText: string): string[] {
+  const lines = responseText
+    .split("\n")
+    .map((line) => line.replace(/\r/g, ""))
+    .filter((line) => line.trim() !== "");
+
+  // Flux CSV responses include metadata rows that start with '#'
+  const dataLines = lines.filter((line) => !line.startsWith("#"));
+
+  if (dataLines.length === 0) {
+    return [];
+  }
+
+  const headers = dataLines[0].split(",").map((header) => header.trim());
+  const valueIndex = headers.indexOf("_value");
+
+  if (valueIndex === -1) {
+    return [];
+  }
+
+  return dataLines.slice(1)
+    .map((line) => line.split(",")[valueIndex] || "")
+    .map((value) => value.trim())
+    .filter((m) => m !== "");
+}
 
 // Resource: Get Measurements in a Bucket
 export async function bucketMeasurements(uri: URL, { bucketName }: { bucketName: string }) {
@@ -44,56 +75,10 @@ export async function bucketMeasurements(uri: URL, { bucketName }: { bucketName:
       response.status,
     );
 
-    console.log("Reading response text...");
     const responseText = await response.text();
 
     console.log("Parsing CSV response...");
-    const lines = responseText
-      .split("\n")
-      .map((line) => line.replace(/\r/g, ""))
-      .filter((line) => line.trim() !== "");
-    console.log(`Found ${lines.length} lines in the response`);
-
-    // Flux CSV responses include metadata rows that start with '#'
-    const dataLines = lines.filter((line) => !line.startsWith("#"));
-    console.log(`Found ${dataLines.length} data lines after removing metadata`);
-
-    if (dataLines.length === 0) {
-      console.log("No data rows found in the response");
-      return {
-        contents: [{
-          uri: uri.href,
-          text: JSON.stringify({
-            bucket: bucketName,
-            measurements: [],
-          }),
-        }],
-      };
-    }
-
-    const headers = dataLines[0].split(",").map((header) => header.trim());
-    const valueIndex = headers.indexOf("_value");
-    console.log("Headers:", headers);
-    console.log("Value index:", valueIndex);
-
-    if (valueIndex === -1) {
-      console.log("No _value column found in the response");
-      return {
-        contents: [{
-          uri: uri.href,
-          text: JSON.stringify({
-            bucket: bucketName,
-            measurements: [],
-          }),
-        }],
-      };
-    }
-
-    console.log("Extracting measurement values...");
-    const measurements = dataLines.slice(1)
-      .map((line) => line.split(",")[valueIndex] || "")
-      .map((value) => value.trim())
-      .filter((m) => m !== "");
+    const measurements = parseMeasurementsFromCsv(responseText);
 
     console.log(`Found ${measurements.length} measurements`);
     console.log("Successfully processed measurements request - END");

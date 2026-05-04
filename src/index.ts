@@ -5,8 +5,6 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { program } from "commander";
-import express from "express";
-
 // Import config
 import { validateEnvironment } from "./config/env";
 
@@ -313,103 +311,157 @@ if (!useHttpTransport) {
     connectStdioServer();
   }, 200);
 } else {
-  const app = express();
-  app.use(express.json());
-
   const port = typeof options.http === 'string' ? parseInt(options.http, 10) : 3000;
 
-  app.post('/mcp', async (req: express.Request, res: express.Response) => {
-    logMcpDebug("HTTP POST /mcp received, creating new server and transport.");
-    let server: any;
-    let transport: any;
-    try {
-      server = createMcpServer();
-      transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-      });
+  console.log(`Starting MCP Streamable HTTP Server on port ${port}...`);
 
-      if (transport._send) {
-        const originalSend = transport._send;
-        transport._send = function (data: any) {
-          logMcpDebug("HTTP SENDING:", JSON.stringify(data));
-          return originalSend.call(this, data);
-        };
+  Bun.serve({
+    port,
+    async fetch(req) {
+      const url = new URL(req.url);
+      const pathname = url.pathname;
+
+      if (pathname === '/mcp') {
+        if (req.method === 'POST') {
+          logMcpDebug("HTTP POST /mcp received, creating new server and transport.");
+          const server = createMcpServer();
+          const transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: undefined,
+          });
+
+          // Debugging wrappers for transport
+          if ((transport as any)._send) {
+            const originalSend = (transport as any)._send;
+            (transport as any)._send = function (data: any) {
+              logMcpDebug("HTTP SENDING:", JSON.stringify(data));
+              return originalSend.call(this, data);
+            };
+          }
+          if ((transport as any)._receive) {
+            const originalReceive = (transport as any)._receive;
+            (transport as any)._receive = function (data: any) {
+              logMcpDebug("HTTP RECEIVED:", JSON.stringify(data));
+              return originalReceive.call(this, data);
+            };
+          }
+          const originalOnMessageCallback = transport.onmessage;
+          transport.onmessage = function (message: any) {
+            logMcpDebug("HTTP MESSAGE RECEIVED:", JSON.stringify(message));
+            if (originalOnMessageCallback) {
+              return originalOnMessageCallback.call(this, message);
+            }
+          };
+
+          const body = await req.json() as { id?: string, error?: any, result?: any };
+
+          // Convert Bun Headers to Node.js style plain object for compatibility
+          const nodeHeaders: Record<string, string> = {};
+          req.headers.forEach((value, key) => {
+            nodeHeaders[key.toLowerCase()] = value;
+          });
+
+          // Create an adapter for Node.js http.ServerResponse that Bun.serve can use via ReadableStream
+          const { readable, writable } = new TransformStream();
+          const writer = writable.getWriter();
+          const encoder = new TextEncoder();
+
+          let resStatusCode = 200;
+          const resHeaders = new Headers();
+
+          const resMock: any = {
+            get statusCode() { return resStatusCode; },
+            set statusCode(val) { resStatusCode = val; },
+            setHeader(name: string, value: string) {
+              resHeaders.set(name, value);
+            },
+            writeHead(status: number, headers?: any) {
+              resStatusCode = status;
+              if (headers) {
+                for (const [key, value] of Object.entries(headers)) {
+                  resHeaders.set(key, value as string);
+                }
+              }
+              return this;
+            },
+            write(chunk: any) {
+              writer.write(typeof chunk === 'string' ? encoder.encode(chunk) : chunk);
+            },
+            end(chunk?: any) {
+              if (chunk) {
+                writer.write(typeof chunk === 'string' ? encoder.encode(chunk) : chunk);
+              }
+              writer.close();
+            },
+            on(event: string, listener: any) {
+              if (event === 'close') {
+                req.signal.addEventListener('abort', () => {
+                  logMcpDebug('HTTP connection closed via abort signal.');
+                  listener();
+                });
+              }
+            }
+          };
+
+          const reqMock = {
+            method: req.method,
+            url: req.url,
+            headers: nodeHeaders,
+            socket: {} // Some libraries expect a socket object
+          };
+
+          // Handle server/transport cleanup
+          req.signal.addEventListener('abort', () => {
+            logMcpDebug('HTTP POST /mcp request aborted, cleaning up server and transport.');
+            if (transport) transport.close();
+            if (server) server.close();
+          });
+
+          try {
+            await server.connect(transport);
+            // We run handleRequest but don't await it here because we need to return the Response 
+            // handleRequest will call resMock.write/end which will drive the ReadableStream
+            transport.handleRequest(reqMock as any, resMock as any, body).catch(error => {
+              logMcpError('Error in transport.handleRequest:', error);
+              if (!writer.closed) {
+                writer.abort(error);
+              }
+            });
+
+            return new Response(readable, {
+              status: resStatusCode,
+              headers: resHeaders
+            });
+          } catch (error: any) {
+            logMcpError('Error connecting server to transport:', error);
+            if (server) server.close();
+            if (transport) transport.close();
+            return Response.json({
+              jsonrpc: '2.0',
+              error: {
+                code: -32603,
+                message: 'Internal server error',
+              },
+              id: body?.id || null,
+            }, { status: 500 });
+          }
+        } else if (req.method === 'GET' || req.method === 'DELETE') {
+          logMcpDebug(`Received ${req.method} /mcp request`);
+          return Response.json({
+            jsonrpc: "2.0",
+            error: {
+              code: -32000,
+              message: "Method not allowed for stateless transport."
+            },
+            id: null
+          }, { status: 405 });
+        }
       }
-      if (transport._receive) {
-        const originalReceive = transport._receive;
-        transport._receive = function (data: any) {
-          logMcpDebug("HTTP RECEIVED:", JSON.stringify(data));
-          return originalReceive.call(this, data);
-        };
-      }
-       const originalOnMessageCallback = transport.onmessage;
-       transport.onmessage = function (message: any) {
-         logMcpDebug("HTTP MESSAGE RECEIVED:", JSON.stringify(message));
-         if (originalOnMessageCallback) {
-           return originalOnMessageCallback.call(this, message);
-         }
-       };
 
-      res.on('close', () => {
-        logMcpDebug('HTTP POST /mcp request closed, cleaning up server and transport.');
-        if (transport) transport.close();
-        if (server) server.close();
-      });
-
-      await server.connect(transport);
-      await transport.handleRequest(req, res, req.body);
-    } catch (error: any) {
-      logMcpError('Error handling MCP HTTP request:', error);
-      if (server) server.close();
-      if (transport) transport.close();
-      if (!res.headersSent) {
-        res.status(500).json({
-          jsonrpc: '2.0',
-          error: {
-            code: -32603,
-            message: 'Internal server error',
-          },
-          id: req.body?.id || null,
-        });
-      }
-    }
-  });
-
-  app.get('/mcp', async (_req, res) => {
-    logMcpDebug('Received GET /mcp request');
-    res.status(405).json({
-      jsonrpc: "2.0",
-      error: {
-        code: -32000,
-        message: "Method not allowed for stateless transport."
-      },
-      id: null
-    });
-  });
-
-  app.delete('/mcp', async (_req, res) => {
-    logMcpDebug('Received DELETE /mcp request');
-    res.status(405).json({
-      jsonrpc: "2.0",
-      error: {
-        code: -32000,
-        message: "Method not allowed for stateless transport."
-      },
-      id: null
-    });
-  });
-
-  const httpServer = app.listen(port, () => {
-    console.log(`MCP Streamable HTTP Server listening on port ${port}`);
-  });
-
-  httpServer.on('error', (err: any) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`Error: Port ${port} is already in use. Please choose a different port or free up port ${port}.`);
-      process.exit(1);
-    } else {
-      console.error('Failed to start HTTP server:', err);
-      process.exit(1);
+      return new Response("Not Found", { status: 404 });
+    },
+    error(err) {
+      console.error('Bun.serve error:', err);
+      return new Response("Internal Server Error", { status: 500 });
     }
   });
 }
