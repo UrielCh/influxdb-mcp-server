@@ -5,9 +5,9 @@ export async function fluxQueryExamplesPrompt() {
   // Simple, direct approach - no dependencies
   const promptResponse = {
     messages: [{
-      role: "user",
+      role: "user" as const,
       content: {
-        type: "text",
+        type: "text" as const,
         text: `Here are some example Flux queries for InfluxDB:
 
 1. Get data from the last 5 minutes:

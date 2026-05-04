@@ -1,7 +1,12 @@
-import { influxRequest } from "../utils/influxClient.js";
+import { influxRequest } from "../utils/influxClient";
+
+interface QueryDataArgs {
+  org: string;
+  query: string;
+}
 
 // Tool: Query Data
-export async function queryData({ org, query }) {
+export async function queryData({ org, query }: QueryDataArgs) {
   try {
     const response = await influxRequest(
       `/api/v2/query?org=${encodeURIComponent(org)}`,
@@ -15,14 +20,14 @@ export async function queryData({ org, query }) {
 
     return {
       content: [{
-        type: "text",
+        type: "text" as const,
         text: responseText,
       }],
     };
-  } catch (error) {
+  } catch (error: any) {
     return {
       content: [{
-        type: "text",
+        type: "text" as const,
         text: `Error executing query: ${error.message}`,
       }],
       isError: true,

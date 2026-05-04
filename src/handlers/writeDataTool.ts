@@ -1,8 +1,14 @@
-import fetch from "node-fetch";
-import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env.js";
+import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env";
+
+interface WriteDataArgs {
+  org: string;
+  bucket: string;
+  data: string;
+  precision?: string;
+}
 
 // Tool: Write Data
-export async function writeData({ org, bucket, data, precision }) {
+export async function writeData({ org, bucket, data, precision }: WriteDataArgs) {
   // Add extremely clear logging
   console.log(`=== WRITE-DATA TOOL CALLED ===`);
   console.log(
@@ -11,15 +17,14 @@ export async function writeData({ org, bucket, data, precision }) {
 
   try {
     // Simplified approach focusing on core functionality
-    let endpoint = `/api/v2/write?org=${encodeURIComponent(org)}&bucket=${encodeURIComponent(bucket)
-      }`;
+    let endpoint = `/api/v2/write?org=${encodeURIComponent(org)}&bucket=${encodeURIComponent(bucket)}`;
     if (precision) {
       endpoint += `&precision=${precision}`;
     }
 
     console.log(`Write URL: ${INFLUXDB_URL}${endpoint}`);
 
-    // Use fetch directly instead of our wrapper to eliminate any potential issues
+    // Use fetch directly
     const response = await fetch(`${INFLUXDB_URL}${endpoint}`, {
       method: "POST",
       headers: {
@@ -41,15 +46,15 @@ export async function writeData({ org, bucket, data, precision }) {
     console.log(`=== WRITE-DATA TOOL COMPLETED SUCCESSFULLY ===`);
     return {
       content: [{
-        type: "text",
+        type: "text" as const,
         text: "Data written successfully",
       }],
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error(`=== WRITE-DATA TOOL ERROR: ${error.message} ===`);
     return {
       content: [{
-        type: "text",
+        type: "text" as const,
         text: `Error writing data: ${error.message}`,
       }],
       isError: true,

@@ -1,8 +1,13 @@
-import fetch from "node-fetch";
-import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env.js";
+import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env";
+
+interface CreateBucketArgs {
+  name: string;
+  orgID: string;
+  retentionPeriodSeconds?: number;
+}
 
 // Tool: Create Bucket
-export async function createBucket({ name, orgID, retentionPeriodSeconds }) {
+export async function createBucket({ name, orgID, retentionPeriodSeconds }: CreateBucketArgs) {
   console.log(`=== CREATE-BUCKET TOOL CALLED ===`);
   console.log(`Creating bucket: ${name}, orgID: ${orgID}`);
 
@@ -19,7 +24,7 @@ export async function createBucket({ name, orgID, retentionPeriodSeconds }) {
 
     console.log(`Creating bucket with data: ${JSON.stringify(bucketData)}`);
 
-    // Use fetch directly instead of our wrapper
+    // Use fetch directly
     const response = await fetch(`${INFLUXDB_URL}/api/v2/buckets`, {
       method: "POST",
       headers: {
@@ -38,21 +43,21 @@ export async function createBucket({ name, orgID, retentionPeriodSeconds }) {
       );
     }
 
-    const bucketResponse = await response.json();
+    const bucketResponse = await response.json() as any;
 
     console.log(`=== CREATE-BUCKET TOOL COMPLETED SUCCESSFULLY ===`);
     return {
       content: [{
-        type: "text",
+        type: "text" as const,
         text:
           `Bucket created successfully:\nID: ${bucketResponse.id}\nName: ${bucketResponse.name}\nOrganization ID: ${bucketResponse.orgID}`,
       }],
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error(`=== CREATE-BUCKET TOOL ERROR: ${error.message} ===`);
     return {
       content: [{
-        type: "text",
+        type: "text" as const,
         text: `Error creating bucket: ${error.message}`,
       }],
       isError: true,

@@ -1,8 +1,8 @@
-import { influxRequest } from "../utils/influxClient.js";
-import { DEFAULT_ORG } from "../config/env.js";
+import { influxRequest } from "../utils/influxClient";
+import { DEFAULT_ORG } from "../config/env";
 
 // Resource: Get Measurements in a Bucket
-export async function bucketMeasurements(uri, { bucketName }) {
+export async function bucketMeasurements(uri: URL, { bucketName }: { bucketName: string }) {
   console.log(
     `Processing measurements in bucket '${bucketName}' request - START`,
   );
@@ -26,9 +26,7 @@ export async function bucketMeasurements(uri, { bucketName }) {
       `Creating Flux query for bucket '${bucketName}' measurements`,
     );
     const queryBody = JSON.stringify({
-      query: `import "influxdata/influxdb/schema"
-
-schema.measurements(bucket: "${bucketName}")`,
+      query: `import "influxdata/influxdb/schema"\n\nschema.measurements(bucket: "${bucketName}")`,
       type: "flux",
     });
 
@@ -109,7 +107,7 @@ schema.measurements(bucket: "${bucketName}")`,
         }),
       }],
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error in bucket measurements resource: ${error.message}`);
     console.error(error.stack);
 

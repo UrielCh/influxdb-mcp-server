@@ -5,9 +5,9 @@ export async function lineProtocolGuidePrompt() {
   // Simple, direct approach - no dependencies
   const promptResponse = {
     messages: [{
-      role: "user",
+      role: "user" as const,
       content: {
-        type: "text",
+        type: "text" as const,
         text: `# InfluxDB Line Protocol Guide
 
 Line protocol is the text format for writing data to InfluxDB. It follows this structure:

@@ -1,7 +1,7 @@
-import { jest } from "@jest/globals";
+import { describe, test, expect, beforeAll, afterAll, mock } from "bun:test";
 import { spawn } from "child_process";
 import Docker from "dockerode";
-import fetch from "node-fetch";
+
 import { Client as McpClient } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import * as path from "path";
@@ -28,7 +28,7 @@ const INFLUXDB_USERNAME = "admin";
 const INFLUXDB_PASSWORD = "adminpassword";
 
 // Increased test timeout for Docker operations
-jest.setTimeout(60000); // 60 seconds for Docker operations
+ // jest.setTimeout(60000); // 60 seconds for Docker operations
 
 // This test suite focuses only on direct InfluxDB API testing without using MCP
 // This approach isolates the InfluxDB functionality from MCP client connectivity issues
@@ -120,7 +120,7 @@ describe("InfluxDB MCP Server Integration Tests", () => {
       console.log("Cleaning up MCP client and server...");
 
       // Set a flag to indicate cleanup is in progress
-      global.testCleanupInProgress = true;
+      globalThis.testCleanupInProgress = true;
 
       // Close MCP client if it exists
       if (mcpClient) {
@@ -177,9 +177,9 @@ describe("InfluxDB MCP Server Integration Tests", () => {
       }
 
       // Clear the global heartbeat interval if it exists
-      if (global.mcpHeartbeatInterval) {
-        clearInterval(global.mcpHeartbeatInterval);
-        global.mcpHeartbeatInterval = null;
+      if (globalThis.mcpHeartbeatInterval) {
+        clearInterval(globalThis.mcpHeartbeatInterval);
+        globalThis.mcpHeartbeatInterval = null;
         console.log("Cleared global heartbeat interval");
       }
 
@@ -246,7 +246,7 @@ describe("InfluxDB MCP Server Integration Tests", () => {
         // Wait for pkill process to complete before finishing cleanup
         await new Promise((resolve) => {
           // In ES modules, we need to use the already imported spawn/exec function
-          const spawnProcess = spawn("pkill", ["-f", "node.*src/index.js"]);
+          const spawnProcess = spawn("pkill", ["-f", "node.*src/index.ts"]);
 
           spawnProcess.on("close", (code) => {
             if (code !== 0 && code !== 1) { // code 1 just means no processes found
@@ -269,7 +269,7 @@ describe("InfluxDB MCP Server Integration Tests", () => {
       console.error("Error during test cleanup:", error.message);
     } finally {
       // Reset the cleanup flag
-      global.testCleanupInProgress = false;
+      globalThis.testCleanupInProgress = false;
       console.log("Test cleanup completed");
     }
   });
@@ -555,8 +555,8 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
 
       // Create the transport first (it will spawn the server process)
       const transport = new StdioClientTransport({
-        command: process.execPath,
-        args: [path.join(__dirname, "../src/index.js")],
+        command:  process.execPath,
+        args: [path.join(__dirname, "../src/index.ts")],
         env: serverEnv,
         stderr: "pipe", // Capture stderr for logging
         stdout: "pipe", // Also capture stdout
@@ -654,7 +654,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
           // Use named function so we can remove it later
           const stderrHandler = (data) => {
             // Only log if we're not in cleanup mode
-            if (!global.testCleanupInProgress) {
+            if (!globalThis.testCleanupInProgress) {
               console.error(`Server stderr: ${data.toString().trim()}`);
             }
           };
@@ -668,7 +668,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
           // Use named function so we can remove it later
           const stdoutHandler = (data) => {
             // Only log if we're not in cleanup mode
-            if (!global.testCleanupInProgress) {
+            if (!globalThis.testCleanupInProgress) {
               console.log(`Server stdout: ${data.toString().trim()}`);
             }
           };
@@ -1373,8 +1373,8 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       // We'll spawn our server directly, communicate with it, then check if data was written
 
       // First, spawn the server process directly
-      const serverProcess = spawn(process.execPath, [
-        path.join(__dirname, "../src/index.js"),
+      const serverProcess = spawn( process.execPath, [
+        path.join(__dirname, "../src/index.ts"),
       ], {
         env: {
           ...process.env,
@@ -1977,8 +1977,8 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       async function testPrompt() {
         try {
           // Check the new file paths after refactoring
-          const serverFilePath = '${__dirname}/../src/index.js';
-          const promptFilePath = '${__dirname}/../src/prompts/fluxQueryExamplesPrompt.js';
+          const serverFilePath = '${__dirname}/../src/index.ts';
+          const promptFilePath = '${__dirname}/../src/prompts/fluxQueryExamplesPrompt.ts';
           
           // Check in the main file and the prompt file
           const indexContent = await fs.readFile(serverFilePath, 'utf8');
@@ -2009,7 +2009,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
 
       // Execute the script
       const { stdout, stderr } = await new Promise((resolve, reject) => {
-        const child = spawn(process.execPath, [tempScriptPath], {
+        const child = spawn( process.execPath, [tempScriptPath], {
           env: process.env,
         });
 
@@ -2209,8 +2209,8 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
       async function testPrompt() {
         try {
           // Check the new file paths after refactoring
-          const serverFilePath = '${__dirname}/../src/index.js';
-          const promptFilePath = '${__dirname}/../src/prompts/lineProtocolGuidePrompt.js';
+          const serverFilePath = '${__dirname}/../src/index.ts';
+          const promptFilePath = '${__dirname}/../src/prompts/lineProtocolGuidePrompt.ts';
           
           // Check in the main file and the prompt file
           const indexContent = await fs.readFile(serverFilePath, 'utf8');
@@ -2241,7 +2241,7 @@ schema.measurements(bucket: "${INFLUXDB_BUCKET}")`,
 
       // Execute the script
       const { stdout, stderr } = await new Promise((resolve, reject) => {
-        const child = spawn(process.execPath, [tempScriptPath], {
+        const child = spawn( process.execPath, [tempScriptPath], {
           env: process.env,
         });
 

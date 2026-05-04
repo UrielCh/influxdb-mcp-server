@@ -1,8 +1,8 @@
-import { influxRequest } from "../utils/influxClient.js";
-import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env.js";
+import { influxRequest } from "../utils/influxClient";
+import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env";
 
 // Resource: List Buckets
-export async function listBuckets(uri) {
+export async function listBuckets(uri: URL) {
   console.log("Processing list buckets request - START");
 
   try {
@@ -20,7 +20,7 @@ export async function listBuckets(uri) {
 
     // Also add timeout for JSON parsing
     console.log("Parsing response body for buckets...");
-    const data = await response.json();
+    const data = await response.json() as any;
     console.log(`Found ${data.buckets?.length || 0} buckets`);
 
     // If we have no buckets, return an empty array as stringified JSON in text field
@@ -47,7 +47,7 @@ export async function listBuckets(uri) {
 
     console.log("Successfully processed list buckets request - END");
     return result;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in list buckets resource:", error.message);
     console.error(error.stack);
 

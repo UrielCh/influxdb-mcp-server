@@ -1,8 +1,7 @@
-import fetch from "node-fetch";
-import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env.js";
+import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env";
 
 // Resource: Query data as a resource
-export async function executeQuery(uri, { orgName, fluxQuery }) {
+export async function executeQuery(uri: URL, { orgName, fluxQuery }: { orgName: string, fluxQuery: string }) {
   console.log(`=== QUERY RESOURCE CALLED ===`);
   console.log(`Query for org: ${orgName}, query length: ${fluxQuery.length}`);
 
@@ -11,8 +10,7 @@ export async function executeQuery(uri, { orgName, fluxQuery }) {
     console.log(`Decoded query: ${decodedQuery.substring(0, 50)}...`);
 
     // Direct fetch approach
-    const queryUrl = `${INFLUXDB_URL}/api/v2/query?org=${encodeURIComponent(orgName)
-      }`;
+    const queryUrl = `${INFLUXDB_URL}/api/v2/query?org=${encodeURIComponent(orgName)}`;
     console.log(`Query URL: ${queryUrl}`);
 
     const response = await fetch(queryUrl, {
@@ -46,7 +44,7 @@ export async function executeQuery(uri, { orgName, fluxQuery }) {
       const headers = lines[0].split(",");
       const data = lines.slice(1).map((line) => {
         const values = line.split(",");
-        const record = {};
+        const record: Record<string, string> = {};
         headers.forEach((header, index) => {
           record[header] = values[index];
         });
@@ -79,7 +77,7 @@ export async function executeQuery(uri, { orgName, fluxQuery }) {
     }
 
     return result;
-  } catch (error) {
+  } catch (error: any) {
     console.error(`=== QUERY RESOURCE ERROR: ${error.message} ===`);
     return {
       contents: [{

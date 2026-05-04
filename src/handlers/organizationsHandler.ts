@@ -1,8 +1,8 @@
-import { influxRequest } from "../utils/influxClient.js";
-import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env.js";
+import { influxRequest } from "../utils/influxClient";
+import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env";
 
 // Resource: List Organizations
-export async function listOrganizations(uri) {
+export async function listOrganizations(uri: URL) {
   console.log("Processing list organizations request - START");
 
   try {
@@ -20,7 +20,7 @@ export async function listOrganizations(uri) {
 
     // Also add timeout for JSON parsing
     console.log("Parsing response body...");
-    const data = await response.json();
+    const data = await response.json() as any;
     console.log(`Found ${data.orgs?.length || 0} organizations`);
 
     // If we have no orgs, return an empty array as stringified JSON in text field
@@ -47,7 +47,7 @@ export async function listOrganizations(uri) {
 
     console.log("Successfully processed list organizations request - END");
     return result;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in list organizations resource:", error.message);
     console.error(error.stack);
 

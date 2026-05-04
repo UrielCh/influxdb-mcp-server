@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -8,26 +8,32 @@ import { program } from "commander";
 import express from "express";
 
 // Import config
-import { validateEnvironment } from "./config/env.js";
+import { validateEnvironment } from "./config/env";
 
 // Import utilities
-import { configureLogger } from "./utils/loggerConfig.js";
+import { configureLogger } from "./utils/loggerConfig";
 
 // Import resource handlers
-import { listOrganizations } from "./handlers/organizationsHandler.js";
-import { listBuckets } from "./handlers/bucketsHandler.js";
-import { bucketMeasurements } from "./handlers/measurementsHandler.js";
-import { executeQuery } from "./handlers/queryHandler.js";
+import { listOrganizations } from "./handlers/organizationsHandler";
+import { listBuckets } from "./handlers/bucketsHandler";
+import { bucketMeasurements } from "./handlers/measurementsHandler";
+import { executeQuery } from "./handlers/queryHandler";
 
 // Import tool handlers
-import { writeData } from "./handlers/writeDataTool.js";
-import { queryData } from "./handlers/queryDataTool.js";
-import { createBucket } from "./handlers/createBucketTool.js";
-import { createOrg } from "./handlers/createOrgTool.js";
+import { writeData } from "./handlers/writeDataTool";
+import { queryData } from "./handlers/queryDataTool";
+import { createBucket } from "./handlers/createBucketTool";
+import { createOrg } from "./handlers/createOrgTool";
 
 // Import prompt handlers
-import { fluxQueryExamplesPrompt } from "./prompts/fluxQueryExamplesPrompt.js";
-import { lineProtocolGuidePrompt } from "./prompts/lineProtocolGuidePrompt.js";
+import { fluxQueryExamplesPrompt } from "./prompts/fluxQueryExamplesPrompt";
+import { lineProtocolGuidePrompt } from "./prompts/lineProtocolGuidePrompt";
+
+// Declare global types for Bun/Node compatibility
+declare global {
+  var mcpHeartbeatInterval: any;
+  var testCleanupInProgress: boolean;
+}
 
 // Configure logger and validate environment
 configureLogger();
@@ -61,14 +67,14 @@ const createMcpServer = () => {
     new ResourceTemplate("influxdb://bucket/{bucketName}/measurements", {
       list: undefined,
     }),
-    bucketMeasurements,
+    bucketMeasurements as any,
   );
   server.resource(
     "query",
     new ResourceTemplate("influxdb://query/{orgName}/{fluxQuery}", {
       list: undefined,
     }),
-    executeQuery,
+    executeQuery as any,
   );
 
   // Register tools
@@ -98,7 +104,7 @@ const createMcpServer = () => {
           "Optional timestamp precision. Provide it only when the line protocol omits unit suffix context; defaults to nanoseconds.",
         ),
     },
-    writeData,
+    writeData as any,
   );
   server.tool(
     "query-data",
@@ -115,7 +121,7 @@ const createMcpServer = () => {
           "Flux query text. Multi-line strings are supported; results are returned as annotated CSV for easy parsing.",
         ),
     },
-    queryData,
+    queryData as any,
   );
   server.tool(
     "create-bucket",
@@ -138,7 +144,7 @@ const createMcpServer = () => {
           "Optional retention duration expressed in seconds. Omit for infinite retention.",
         ),
     },
-    createBucket,
+    createBucket as any,
   );
   server.tool(
     "create-org",
@@ -156,12 +162,12 @@ const createMcpServer = () => {
           "Optional free-form description that helps humans understand why the org exists.",
         ),
     },
-    createOrg,
+    createOrg as any,
   );
 
   // Register prompts
-  server.prompt("flux-query-examples", {}, fluxQueryExamplesPrompt);
-  server.prompt("line-protocol-guide", {}, lineProtocolGuidePrompt);
+  server.prompt("flux-query-examples", {}, fluxQueryExamplesPrompt as any);
+  server.prompt("line-protocol-guide", {}, lineProtocolGuidePrompt as any);
 
   return server;
 };
@@ -169,101 +175,88 @@ const createMcpServer = () => {
 // Create MCP server for stdio or as a template for HTTP
 const globalServer = createMcpServer();
 
-
 // Add a global error handler
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
-  // Don't exit - just log the error, as this could be caught and handled elsewhere
 });
 
 // Enhanced MCP protocol debugging
 const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
 
-// Create special debugging functions for MCP protocol
-function logMcpDebug(...args) {
+function logMcpDebug(...args: any[]) {
   originalConsoleLog("[MCP-DEBUG]", ...args);
 }
 
-function logMcpError(...args) {
+function logMcpError(...args: any[]) {
   originalConsoleError("[MCP-ERROR]", ...args);
 }
 
 // Enable extra protocol tracing for all requests/responses
-// This debugging for globalServer.server is primarily for Stdio mode or if a global server instance were used.
-// For HTTP mode, per-request server instances are created.
-if (globalServer.server && !options.http) { // Only apply this if not in HTTP mode, or adjust as needed
-  const originalOnMessage = globalServer.server.onmessage;
-  globalServer.server.onmessage = function (message) {
+if ((globalServer as any).server && !options.http) {
+  const serverInstance = (globalServer as any).server;
+  const originalOnMessage = serverInstance.onmessage;
+  serverInstance.onmessage = function (message: any) {
     logMcpDebug("SERVER RECEIVED MESSAGE:", JSON.stringify(message));
     if (originalOnMessage) {
       return originalOnMessage.call(this, message);
     }
   };
 
-  // Log server responses
-  const originalSendResponse = globalServer.server._sendResponse;
+  const originalSendResponse = serverInstance._sendResponse;
   if (originalSendResponse) {
-    globalServer.server._sendResponse = function (id, result) {
+    serverInstance._sendResponse = function (id: any, result: any) {
       logMcpDebug("SERVER SENDING RESPONSE:", JSON.stringify({ id, result }));
       return originalSendResponse.call(this, id, result);
     };
   }
 
-  // Log server errors
-  const originalSendError = globalServer.server._sendError;
+  const originalSendError = serverInstance._sendError;
   if (originalSendError) {
-    globalServer.server._sendError = function (id, error) {
+    serverInstance._sendError = function (id: any, error: any) {
       logMcpDebug("SERVER SENDING ERROR:", JSON.stringify({ id, error }));
       return originalSendError.call(this, id, error);
     };
   }
 }
 
-// The rest of the debugging and connection logic will be handled differently
-// for StdioServerTransport vs StreamableHTTPServerTransport.
-// This will be addressed in the next step when setting up the Express server.
-
 const useHttpTransport = options.http !== undefined;
 
 if (!useHttpTransport) {
-  // Start the server with stdio transport
   console.log("Starting MCP server with stdio transport...");
   const stdioTransport = new StdioServerTransport();
 
-  // Add extra debugging to the stdioTransport
-  if (stdioTransport._send) {
-    const originalSend = stdioTransport._send;
-    stdioTransport._send = function (data) {
+  const transportAny = stdioTransport as any;
+  if (transportAny._send) {
+    const originalSend = transportAny._send;
+    transportAny._send = function (data: any) {
       logMcpDebug("STDIO SENDING:", JSON.stringify(data));
       return originalSend.call(this, data);
     };
   }
 
-  if (stdioTransport._receive) {
-    const originalReceive = stdioTransport._receive;
-    stdioTransport._receive = function (data) {
+  if (transportAny._receive) {
+    const originalReceive = transportAny._receive;
+    transportAny._receive = function (data: any) {
       logMcpDebug("STDIO RECEIVED:", JSON.stringify(data));
       return originalReceive.call(this, data);
     };
   }
 
   const originalStdioOnMessageCallback = stdioTransport.onmessage;
-  stdioTransport.onmessage = function (message) {
+  stdioTransport.onmessage = function (message: any) {
     logMcpDebug("MESSAGE RECEIVED VIA STDIO:", JSON.stringify(message));
     if (originalStdioOnMessageCallback) {
       return originalStdioOnMessageCallback.call(this, message);
     }
   };
 
-  // Check if we're in test mode
   const isTestMode = process.env.MCP_TEST_MODE === "true";
   if (isTestMode) {
     console.log("Running in test mode with enhanced protocol debugging for STDIO");
 
-    // Add debugging for server methods
     const originalConnect = globalServer.connect;
-    globalServer.connect = async function (transportInstance) {
+    globalServer.connect = async function (transportInstance: any) {
       logMcpDebug("GlobalServer.connect() called with stdio transport");
       try {
         const result = await originalConnect.call(this, transportInstance);
@@ -276,11 +269,10 @@ if (!useHttpTransport) {
     };
   }
 
-  // Create a function to handle connection for stdio
   const connectStdioServer = async () => {
     try {
       console.log("Connecting global server to stdio transport...");
-      await globalServer.connect(stdioTransport); // Use stdioTransport here
+      await globalServer.connect(stdioTransport);
       console.log("Global server successfully connected to stdio transport");
 
       if (isTestMode) {
@@ -297,15 +289,16 @@ if (!useHttpTransport) {
             }
           });
         }
-        if (globalServer.server) {
-            globalServer.server.onclose = () => {
+        const serverInstance = (globalServer as any).server;
+        if (serverInstance) {
+          serverInstance.onclose = () => {
             logMcpError("STDIO SERVER CONNECTION CLOSED");
             if (global.mcpHeartbeatInterval) {
               clearInterval(global.mcpHeartbeatInterval);
               global.mcpHeartbeatInterval = null;
             }
           };
-          globalServer.server.onerror = (err) => {
+          serverInstance.onerror = (err: any) => {
             logMcpError("STDIO SERVER ERROR:", err);
           };
         }
@@ -320,47 +313,42 @@ if (!useHttpTransport) {
     connectStdioServer();
   }, 200);
 } else {
-  // Start the server with Streamable HTTP transport
   const app = express();
   app.use(express.json());
 
   const port = typeof options.http === 'string' ? parseInt(options.http, 10) : 3000;
 
-  app.post('/mcp', async (req, res) => {
-    // In stateless mode, create a new instance of transport and server for each request
-    // to ensure complete isolation.
+  app.post('/mcp', async (req: express.Request, res: express.Response) => {
     logMcpDebug("HTTP POST /mcp received, creating new server and transport.");
-    let server;
-    let transport;
+    let server: any;
+    let transport: any;
     try {
       server = createMcpServer();
       transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined, // Stateless
+        sessionIdGenerator: undefined,
       });
 
-      // Attach logger to the specific transport instance
       if (transport._send) {
         const originalSend = transport._send;
-        transport._send = function (data) {
+        transport._send = function (data: any) {
           logMcpDebug("HTTP SENDING:", JSON.stringify(data));
           return originalSend.call(this, data);
         };
       }
       if (transport._receive) {
         const originalReceive = transport._receive;
-        transport._receive = function (data) {
+        transport._receive = function (data: any) {
           logMcpDebug("HTTP RECEIVED:", JSON.stringify(data));
           return originalReceive.call(this, data);
         };
       }
        const originalOnMessageCallback = transport.onmessage;
-       transport.onmessage = function (message) {
+       transport.onmessage = function (message: any) {
          logMcpDebug("HTTP MESSAGE RECEIVED:", JSON.stringify(message));
          if (originalOnMessageCallback) {
            return originalOnMessageCallback.call(this, message);
          }
        };
-
 
       res.on('close', () => {
         logMcpDebug('HTTP POST /mcp request closed, cleaning up server and transport.');
@@ -370,10 +358,10 @@ if (!useHttpTransport) {
 
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
-    } catch (error) {
+    } catch (error: any) {
       logMcpError('Error handling MCP HTTP request:', error);
-      if (server) server.close(); // Ensure server is closed on error
-      if (transport) transport.close(); // Ensure transport is closed on error
+      if (server) server.close();
+      if (transport) transport.close();
       if (!res.headersSent) {
         res.status(500).json({
           jsonrpc: '2.0',
@@ -387,35 +375,35 @@ if (!useHttpTransport) {
     }
   });
 
-  app.get('/mcp', async (req, res) => {
+  app.get('/mcp', async (_req, res) => {
     logMcpDebug('Received GET /mcp request');
-    res.writeHead(405).end(JSON.stringify({
+    res.status(405).json({
       jsonrpc: "2.0",
       error: {
         code: -32000,
         message: "Method not allowed for stateless transport."
       },
       id: null
-    }));
+    });
   });
 
-  app.delete('/mcp', async (req, res) => {
+  app.delete('/mcp', async (_req, res) => {
     logMcpDebug('Received DELETE /mcp request');
-    res.writeHead(405).end(JSON.stringify({
+    res.status(405).json({
       jsonrpc: "2.0",
       error: {
         code: -32000,
         message: "Method not allowed for stateless transport."
       },
       id: null
-    }));
+    });
   });
 
   const httpServer = app.listen(port, () => {
     console.log(`MCP Streamable HTTP Server listening on port ${port}`);
   });
 
-  httpServer.on('error', (err) => {
+  httpServer.on('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`Error: Port ${port} is already in use. Please choose a different port or free up port ${port}.`);
       process.exit(1);

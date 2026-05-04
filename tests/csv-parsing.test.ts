@@ -1,34 +1,33 @@
-import { jest } from "@jest/globals";
+import { describe, test, expect, beforeAll, mock } from "bun:test";
 
-// Test timeout
-jest.setTimeout(10000);
+// Mock the influxClient module
+mock.module("../src/utils/influxClient", () => ({
+  influxRequest: mock(() => Promise.resolve({
+    status: 200,
+    ok: true,
+    text: async () => ""
+  })),
+}));
+
+// Mock the env module
+mock.module("../src/config/env", () => ({
+  INFLUXDB_URL: "http://localhost:8086",
+  INFLUXDB_TOKEN: "test-token",
+  DEFAULT_ORG: "test-org",
+  validateEnvironment: () => {},
+}));
 
 describe("CSV Parsing Edge Cases - Issue #8", () => {
-  let bucketMeasurements;
-  let mockInfluxRequest;
+  let bucketMeasurements: any;
+  let mockInfluxRequest: any;
 
   beforeAll(async () => {
-    // Mock the influxClient module before importing the handler
-    jest.unstable_mockModule("../src/utils/influxClient.js", () => ({
-      influxRequest: jest.fn(),
-    }));
-
-    // Mock the env module
-    jest.unstable_mockModule("../src/config/env.js", () => ({
-      INFLUXDB_URL: "http://localhost:8086",
-      INFLUXDB_TOKEN: "test-token",
-      DEFAULT_ORG: "test-org",
-      validateEnvironment: () => {},
-    }));
-
     // Import the handler after mocking
-    const measurementsHandler = await import(
-      "../src/handlers/measurementsHandler.js"
-    );
+    const measurementsHandler = await import("../src/handlers/measurementsHandler");
     bucketMeasurements = measurementsHandler.bucketMeasurements;
 
     // Get reference to the mocked function
-    const influxClient = await import("../src/utils/influxClient.js");
+    const influxClient = await import("../src/utils/influxClient");
     mockInfluxRequest = influxClient.influxRequest;
   });
 
@@ -37,10 +36,6 @@ describe("CSV Parsing Edge Cases - Issue #8", () => {
       "Testing CSV parsing with Flux metadata rows - reproducing Issue #8",
     );
 
-    // This CSV response reproduces the exact issue from #8:
-    // - Flux metadata rows starting with # appear before the header row
-    // - Without the fix, the code would try to parse line[0] (a metadata row)
-    //   as the header, causing indexOf("_value") to return -1
     const problematicCsvResponse =
       "#datatype,string,long,string\n" +
       "#group,false,false,false\n" +
@@ -86,7 +81,6 @@ describe("CSV Parsing Edge Cases - Issue #8", () => {
   test("should trim whitespace from header names", async () => {
     console.log("Testing CSV parsing with whitespace in headers");
 
-    // CSV with whitespace in header names (though uncommon, the fix handles it)
     const csvWithWhitespace =
       "#datatype,string,long,string\n" +
       ", result , table , _value \n" +
@@ -115,7 +109,6 @@ describe("CSV Parsing Edge Cases - Issue #8", () => {
   test("should handle CSV with extensive metadata rows", async () => {
     console.log("Testing CSV parsing with extensive metadata");
 
-    // CSV with many metadata rows (all starting with #)
     const csvWithMetadata =
       "#datatype,string,long,string\r\n" +
       "#group,false,false,false\r\n" +
@@ -146,7 +139,6 @@ describe("CSV Parsing Edge Cases - Issue #8", () => {
   test("should handle empty CSV response", async () => {
     console.log("Testing CSV parsing with empty response");
 
-    // CSV with only metadata, no data rows
     const emptyCsv =
       "#datatype,string,long,string\r\n" +
       "#group,false,false,false\r\n";
@@ -173,7 +165,6 @@ describe("CSV Parsing Edge Cases - Issue #8", () => {
   test("should handle CSV with missing _value column", async () => {
     console.log("Testing CSV parsing without _value column");
 
-    // CSV without the _value column
     const csvWithoutValue =
       ",result,table,measurement\r\n" +
       ",,0,cpu_usage\r\n";
@@ -190,7 +181,6 @@ describe("CSV Parsing Edge Cases - Issue #8", () => {
     const response = await bucketMeasurements(uri, params);
     const result = JSON.parse(response.contents[0].text);
 
-    // Should return empty array when _value column is missing
     expect(result.measurements).toBeDefined();
     expect(Array.isArray(result.measurements)).toBe(true);
     expect(result.measurements).toHaveLength(0);
@@ -201,7 +191,6 @@ describe("CSV Parsing Edge Cases - Issue #8", () => {
   test("should handle CSV with values containing whitespace", async () => {
     console.log("Testing CSV parsing with whitespace in values");
 
-    // CSV with whitespace in the actual measurement values
     const csvWithValueWhitespace =
       ",result,table,_value\r\n" +
       ",,0, cpu_usage \r\n" +
@@ -220,14 +209,12 @@ describe("CSV Parsing Edge Cases - Issue #8", () => {
     const response = await bucketMeasurements(uri, params);
     const result = JSON.parse(response.contents[0].text);
 
-    // Values should be trimmed
     expect(result.measurements).toHaveLength(3);
     expect(result.measurements).toContain("cpu_usage");
     expect(result.measurements).toContain("temperature");
     expect(result.measurements).toContain("memory_usage");
 
-    // Verify no whitespace remains
-    result.measurements.forEach((m) => {
+    result.measurements.forEach((m: string) => {
       expect(m).toBe(m.trim());
     });
 
