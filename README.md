@@ -63,6 +63,8 @@ The server requires these environment variables:
 - `INFLUXDB_URL` (optional): URL of the InfluxDB instance (defaults to `http://localhost:8086`)
 - `INFLUXDB_ORG` (optional): Default organization name for certain operations
 
+By default the server runs in read-only mode. Requests that write to InfluxDB are blocked, including write endpoints, bucket/org creation, and Flux queries that call `to(...)`. Start the server with `--rw` to allow write operations.
+
 ## Installation
 
 ### Installing via Smithery
@@ -112,6 +114,9 @@ INFLUXDB_TOKEN=your_token npm start -- --http
 
 # Start with Streamable HTTP transport on a specific port
 INFLUXDB_TOKEN=your_token npm start -- --http 8080
+
+# Allow writes to InfluxDB
+INFLUXDB_TOKEN=your_token npm start -- --rw
 ```
 
 If you installed globally or are using npx, you can run:
@@ -121,6 +126,8 @@ INFLUXDB_TOKEN=your_token influxdb-mcp-server --http
 INFLUXDB_TOKEN=your_token influxdb-mcp-server --stdio
 # or
 INFLUXDB_TOKEN=your_token influxdb-mcp-server --http 8080
+# or allow writes
+INFLUXDB_TOKEN=your_token influxdb-mcp-server --rw
 ```
 
 ## Integration with Claude for Desktop

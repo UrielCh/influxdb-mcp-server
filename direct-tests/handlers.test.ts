@@ -102,6 +102,8 @@ describe("InfluxDB MCP Server Direct Handler Tests", () => {
     const queryDataHandler = await import("../src/handlers/queryDataTool");
     const createBucketHandler = await import("../src/handlers/createBucketTool");
     const createOrgHandler = await import("../src/handlers/createOrgTool");
+    const writeProtection = await import("../src/utils/writeProtection");
+    writeProtection.setReadWriteMode(true);
 
     // Assign handler functions
     listOrganizations = orgsHandler.listOrganizations;

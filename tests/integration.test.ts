@@ -598,7 +598,7 @@ temperature,location=datacenter,sensor=rack2 value=25.1 ${Date.now() * 1000000}
       // Create the transport first (it will spawn the server process)
       const transport = new StdioClientTransport({
         command: "bun",
-        args: ["src/index.ts", "--stdio"],
+        args: ["src/index.ts", "--stdio", "--rw"],
         env: mcpServerEnv,
         stdout: "pipe",
         stderr: "pipe",

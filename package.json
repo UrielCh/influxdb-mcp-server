@@ -9,6 +9,7 @@
   "scripts": {
     "test": "bun test",
     "start": "bun src/index.ts",
+    "startstdio": "bun src/index.ts --stdio",
     "check": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\""
   },

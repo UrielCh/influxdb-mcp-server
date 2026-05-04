@@ -1,4 +1,5 @@
 import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env";
+import { assertInfluxRequestAllowed } from "./writeProtection";
 
 /**
  * Helper function for InfluxDB API requests with timeout and proper error handling.
@@ -13,6 +14,8 @@ export async function influxRequest(
   options: RequestInit = {},
   timeoutMs: number = 5000
 ): Promise<Response> {
+  assertInfluxRequestAllowed(endpoint, options);
+
   const url = endpoint.startsWith('http') ? endpoint : `${INFLUXDB_URL}${endpoint}`;
   
   const headers = new Headers(options.headers);
@@ -53,7 +56,9 @@ export async function influxRequest(
     return response;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`InfluxDB API request timed out after ${timeoutMs}ms`);
+      throw new Error(`InfluxDB API request timed out after ${timeoutMs}ms`, {
+        cause: error,
+      });
     }
     
     const errorMessage = error instanceof Error ? error.message : String(error);

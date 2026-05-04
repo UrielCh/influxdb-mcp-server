@@ -12,6 +12,7 @@ import { validateEnvironment } from "./config/env";
 
 // Import utilities
 import { configureLogger } from "./utils/loggerConfig";
+import { setReadWriteMode } from "./utils/writeProtection";
 
 // Import resource handlers
 import { listOrganizations } from "./handlers/organizationsHandler";
@@ -118,9 +119,11 @@ validateEnvironment();
 program
   .option("--http [port]", "Start server with Streamable HTTP transport on specified port (default: 3000)")
   .option("--stdio", "Force stdio transport (default behavior)")
+  .option("--rw", "Allow requests that write to InfluxDB. Without this flag the server runs in read-only mode.")
   .parse(process.argv);
 
 const options = program.opts();
+setReadWriteMode(Boolean(options.rw));
 
 if (options.http !== undefined && options.stdio) {
   console.error("Cannot use --http and --stdio at the same time. Please choose one transport.");
