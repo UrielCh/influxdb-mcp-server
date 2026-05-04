@@ -32,7 +32,10 @@ export function parseMeasurementsFromCsv(responseText: string): string[] {
     .filter((m) => m !== "");
 }
 
-// Resource: Get Measurements in a Bucket
+/**
+ * Resource: Get Measurements in a Bucket
+ * Returns a list of measurement names for a specific bucket.
+ */
 export async function bucketMeasurements(uri: URL, { bucketName }: { bucketName: string }) {
   console.log(
     `Processing measurements in bucket '${bucketName}' request - START`,
@@ -92,15 +95,18 @@ export async function bucketMeasurements(uri: URL, { bucketName }: { bucketName:
         }),
       }],
     };
-  } catch (error: any) {
-    console.error(`Error in bucket measurements resource: ${error.message}`);
-    console.error(error.stack);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    console.error(`Error in bucket measurements resource: ${errorMessage}`);
+    if (errorStack) console.error(errorStack);
 
     return {
       contents: [{
         uri: uri.href,
         text: JSON.stringify({
-          error: `Error retrieving measurements: ${error.message}`,
+          error: `Error retrieving measurements: ${errorMessage}`,
         }),
       }],
       error: true,

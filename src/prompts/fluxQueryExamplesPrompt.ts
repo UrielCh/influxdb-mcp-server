@@ -1,8 +1,12 @@
-// Prompt: Common Flux Queries
-export async function fluxQueryExamplesPrompt() {
+/**
+ * Prompt: Flux Query Examples
+ * Provides a set of Flux query examples for common InfluxDB operations.
+ * 
+ * @returns An object containing the prompt messages with Flux query examples.
+ */
+export async function fluxQueryExamplesPrompt(): Promise<{ messages: { role: "user"; content: { type: "text"; text: string } }[] }> {
   console.log(`=== FLUX-QUERY-EXAMPLES PROMPT CALLED ===`);
 
-  // Simple, direct approach - no dependencies
   const promptResponse = {
     messages: [{
       role: "user" as const,

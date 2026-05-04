@@ -29,7 +29,7 @@ import { lineProtocolGuidePrompt } from "./prompts/lineProtocolGuidePrompt";
 
 // Declare global types for Bun/Node compatibility
 declare global {
-  var mcpHeartbeatInterval: any;
+  var mcpHeartbeatInterval: ReturnType<typeof setInterval> | null;
   var testCleanupInProgress: boolean;
 }
 
@@ -54,7 +54,7 @@ if (options.http !== undefined && options.stdio) {
 const createMcpServer = () => {
   const server = new McpServer({
     name: "InfluxDB",
-    version: "0.1.1",
+    version: "0.2.0",
   });
 
   // Register resources
@@ -63,14 +63,15 @@ const createMcpServer = () => {
   server.resource(
     "bucket-measurements",
     new ResourceTemplate("influxdb://bucket/{bucketName}/measurements", {
-      list: undefined,
+      bucketName: z.string().describe("The name of the bucket"),
     }),
     bucketMeasurements as any,
   );
   server.resource(
     "query",
     new ResourceTemplate("influxdb://query/{orgName}/{fluxQuery}", {
-      list: undefined,
+      orgName: z.string().describe("The organization name"),
+      fluxQuery: z.string().describe("URL-encoded Flux query"),
     }),
     executeQuery as any,
   );
@@ -182,11 +183,11 @@ process.on("unhandledRejection", (reason, promise) => {
 const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
 
-function logMcpDebug(...args: any[]) {
+function logMcpDebug(...args: unknown[]) {
   originalConsoleLog("[MCP-DEBUG]", ...args);
 }
 
-function logMcpError(...args: any[]) {
+function logMcpError(...args: unknown[]) {
   originalConsoleError("[MCP-ERROR]", ...args);
 }
 

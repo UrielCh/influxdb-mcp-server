@@ -1,61 +1,39 @@
-// Prompt: Line Protocol Guide
-export async function lineProtocolGuidePrompt() {
+/**
+ * Prompt: Line Protocol Guide
+ * Provides a guide for the InfluxDB Line Protocol format.
+ * 
+ * @returns An object containing the prompt messages with the Line Protocol guide.
+ */
+export async function lineProtocolGuidePrompt(): Promise<{ messages: { role: "user"; content: { type: "text"; text: string } }[] }> {
   console.log(`=== LINE-PROTOCOL-GUIDE PROMPT CALLED ===`);
 
-  // Simple, direct approach - no dependencies
   const promptResponse = {
     messages: [{
       role: "user" as const,
       content: {
         type: "text" as const,
-        text: `# InfluxDB Line Protocol Guide
+        text: `Here is a guide on InfluxDB Line Protocol:
 
-Line protocol is the text format for writing data to InfluxDB. It follows this structure:
+The basic format is:
+\`measurement_name,tag_key=tag_value,tag_key2=tag_value2 field_key=field_value,field_key2=field_value2 timestamp\`
 
-\`\`\`
-measurement,tag-key=tag-value field-key="field-value" timestamp
-\`\`\`
+Components:
+1. **Measurement**: The name of the data structure (required).
+2. **Tag set**: Key-value pairs for metadata. Tags are indexed (optional).
+3. **Field set**: Key-value pairs for the actual data. Fields are not indexed (required).
+4. **Timestamp**: Unix nanosecond-scale time (optional).
 
-## Components:
+Examples:
+- Simple point: \`weather,location=us-midwest temperature=82 1465839830100400200\`
+- Multiple fields: \`cpu,host=serverA1 usage_user=24.5,usage_system=3.2\`
+- No tags: \`heartrate value=70\`
 
-1. **Measurement**: Name of the measurement (similar to a table in SQL)
-2. **Tags**: Key-value pairs for metadata (used for indexing, optional)
-3. **Fields**: Key-value pairs for the actual data values (required)
-4. **Timestamp**: Unix timestamp in the specified precision (optional, defaults to current time)
-
-## Examples:
-
-1. Basic point:
-\`\`\`
-temperature,room=kitchen value=72.1 1631025259000000000
-\`\`\`
-
-2. Multiple fields:
-\`\`\`
-weather,location=us-midwest temperature=82.0,humidity=54.0,pressure=1012.1 1631025259000000000
-\`\`\`
-
-3. Multiple tags:
-\`\`\`
-cpu_usage,host=server01,region=us-west cpu=64.2,mem=47.3 1631025259000000000
-\`\`\`
-
-4. Different data types:
-\`\`\`
-readings,device=thermostat temperature=72.1,active=true,status="normal" 1631025259000000000
-\`\`\`
-
-## Notes:
-- Escape special characters in string field values with double quotes and backslashes
-- Do not use double quotes for tag values
-- Timestamps are in nanoseconds by default, but can be in other precisions (set with the precision parameter)
-- Multiple points can be written by separating them with newlines
-
-## Common Issues:
-- Field values require a type indicator (no quotes for numbers, true/false for booleans, quotes for strings)
-- At least one field is required per point
-- Special characters (spaces, commas) in measurement names, tag keys, tag values, or field keys must be escaped
-- Timestamps should match the specified precision`,
+Rules:
+- Separate measurement and tags with a comma.
+- Separate tags and fields with a space.
+- Separate multiple tags or multiple fields with a comma.
+- Fields can be floats (default), integers (suffixed with 'i'), strings (in quotes), or booleans.
+- Escape spaces, commas, and equals signs in names and tag values.`,
       },
     }],
   };

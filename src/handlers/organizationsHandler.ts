@@ -1,7 +1,11 @@
 import { influxRequest } from "../utils/influxClient";
 import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env";
+import { InfluxOrganizationsResponse } from "../types/influx";
 
-// Resource: List Organizations
+/**
+ * Resource: List Organizations
+ * Retrieves all organizations from InfluxDB and returns them as a JSON resource.
+ */
 export async function listOrganizations(uri: URL) {
   console.log("Processing list organizations request - START");
 
@@ -11,33 +15,18 @@ export async function listOrganizations(uri: URL) {
     console.log(`INFLUXDB_TOKEN set: ${INFLUXDB_TOKEN ? "Yes" : "No"}`);
 
     console.log("Making request to InfluxDB API...");
-    // Our influxRequest function already has built-in timeout
     const response = await influxRequest("/api/v2/orgs", {}, 5000);
     console.log(
       "Organizations API response received, status:",
       response.status,
     );
 
-    // Also add timeout for JSON parsing
     console.log("Parsing response body...");
-    const data = await response.json() as any;
+    const data = await response.json() as InfluxOrganizationsResponse;
     console.log(`Found ${data.orgs?.length || 0} organizations`);
 
-    // If we have no orgs, return an empty array as stringified JSON in text field
-    if (!data.orgs || data.orgs.length === 0) {
-      console.log("No organizations found, returning empty list as JSON");
-      return {
-        contents: [{
-          uri: uri.href,
-          text: JSON.stringify({ orgs: [] }),
-        }],
-      };
-    }
-
-    // Return the organizations data as stringified JSON in text field
+    // Prepare the result as JSON data in text field
     console.log("Returning organization data as JSON...");
-
-    // Prepare the result as JSON data in the text field
     const result = {
       contents: [{
         uri: uri.href,
@@ -47,16 +36,19 @@ export async function listOrganizations(uri: URL) {
 
     console.log("Successfully processed list organizations request - END");
     return result;
-  } catch (error: any) {
-    console.error("Error in list organizations resource:", error.message);
-    console.error(error.stack);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    console.error("Error in list organizations resource:", errorMessage);
+    if (errorStack) console.error(errorStack);
 
     // Return error as stringified JSON in text field
     return {
       contents: [{
         uri: uri.href,
         text: JSON.stringify({
-          error: `Error retrieving organizations: ${error.message}`,
+          error: `Error retrieving organizations: ${errorMessage}`,
         }),
       }],
       error: true,

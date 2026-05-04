@@ -1,70 +1,65 @@
 import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env";
 
-// Helper function for InfluxDB API requests with timeout
+/**
+ * Helper function for InfluxDB API requests with timeout and proper error handling.
+ * 
+ * @param endpoint The API endpoint (e.g., "/api/v2/orgs")
+ * @param options Standard fetch RequestInit options
+ * @param timeoutMs Request timeout in milliseconds
+ * @returns Promise<Response>
+ */
 export async function influxRequest(
   endpoint: string,
   options: RequestInit = {},
   timeoutMs: number = 5000
 ): Promise<Response> {
-  const url = `${INFLUXDB_URL}${endpoint}`;
-  const defaultOptions: RequestInit = {
-    headers: {
-      Authorization: `Token ${INFLUXDB_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-  };
+  const url = endpoint.startsWith('http') ? endpoint : `${INFLUXDB_URL}${endpoint}`;
+  
+  const headers = new Headers(options.headers);
+  if (!headers.has("Authorization")) {
+    headers.set("Authorization", `Token ${INFLUXDB_TOKEN}`);
+  }
+  // Default to JSON but allow override (e.g. for write data)
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
   console.log(`Making request to: ${url}`);
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
   try {
-    // Use AbortController for proper request cancellation
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort(`InfluxDB API request timed out after ${timeoutMs}ms`);
-    }, timeoutMs);
-
-    // Properly merge headers to avoid conflicts
-    const mergedHeaders = {
-      ...(defaultOptions.headers as Record<string, string>),
-      ...((options.headers || {}) as Record<string, string>),
-    };
-
-    // Add the abort signal to the request options
-    const requestOptions: RequestInit = {
-      ...defaultOptions,
+    const response = await fetch(url, {
       ...options,
-      headers: mergedHeaders,
+      headers,
       signal: controller.signal,
-    };
-
-    console.log(`Request options: ${JSON.stringify({
-      method: requestOptions.method || 'GET',
-      headers: Object.keys(requestOptions.headers as Record<string, string>),
-    })}`);
-
-    // Make the request using Bun's native fetch (or global fetch)
-    const response = await fetch(url, requestOptions);
-
-    // Clear the timeout since the request completed
-    clearTimeout(timeoutId);
+    });
 
     console.log(`Response status: ${response.status}`);
 
     if (!response.ok) {
-      const errorText = await Promise.race([
-        response.text(),
-        new Promise<string>((_, reject) =>
-          setTimeout(() => reject(new Error("Response text timeout")), 3000)
-        ),
-      ]);
+      let errorText = "Unknown error";
+      try {
+        errorText = await response.text();
+      } catch (e) {
+        errorText = `Could not read error response: ${e instanceof Error ? e.message : String(e)}`;
+      }
       throw new Error(`InfluxDB API Error (${response.status}): ${errorText}`);
     }
 
     return response;
-  } catch (error: any) {
-    // Log the error with more details
-    console.error(`Error in influxRequest to ${url}:`, error.message);
-    // Rethrow to be handled by the caller
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`InfluxDB API request timed out after ${timeoutMs}ms`);
+    }
+    
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Error in influxRequest to ${url}:`, errorMessage);
     throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

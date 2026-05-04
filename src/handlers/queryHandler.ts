@@ -1,6 +1,9 @@
-import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env";
+import { influxRequest } from "../utils/influxClient";
 
-// Resource: Query data as a resource
+/**
+ * Resource: Query data as a resource
+ * Executes a Flux query and returns the results as a JSON resource.
+ */
 export async function executeQuery(uri: URL, { orgName, fluxQuery }: { orgName: string, fluxQuery: string }) {
   console.log(`=== QUERY RESOURCE CALLED ===`);
   console.log(`Query for org: ${orgName}, query length: ${fluxQuery.length}`);
@@ -9,27 +12,15 @@ export async function executeQuery(uri: URL, { orgName, fluxQuery }: { orgName: 
     const decodedQuery = decodeURIComponent(fluxQuery);
     console.log(`Decoded query: ${decodedQuery.substring(0, 50)}...`);
 
-    // Direct fetch approach
-    const queryUrl = `${INFLUXDB_URL}/api/v2/query?org=${encodeURIComponent(orgName)}`;
-    console.log(`Query URL: ${queryUrl}`);
-
-    const response = await fetch(queryUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Token ${INFLUXDB_TOKEN}`,
-      },
-      body: JSON.stringify({ query: decodedQuery, type: "flux" }),
-    });
+    const response = await influxRequest(
+      `/api/v2/query?org=${encodeURIComponent(orgName)}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ query: decodedQuery, type: "flux" }),
+      }
+    );
 
     console.log(`Query response status: ${response.status}`);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to execute query: ${response.status} ${errorText}`,
-      );
-    }
 
     const responseText = await response.text();
     console.log(`Query response length: ${responseText.length}`);
@@ -41,9 +32,9 @@ export async function executeQuery(uri: URL, { orgName, fluxQuery }: { orgName: 
     let result;
 
     if (lines.length > 1) {
-      const headers = lines[0].split(",");
+      const headers = lines[0].split(",").map(h => h.trim());
       const data = lines.slice(1).map((line) => {
-        const values = line.split(",");
+        const values = line.split(",").map(v => v.trim());
         const record: Record<string, string> = {};
         headers.forEach((header, index) => {
           record[header] = values[index];
@@ -77,13 +68,14 @@ export async function executeQuery(uri: URL, { orgName, fluxQuery }: { orgName: 
     }
 
     return result;
-  } catch (error: any) {
-    console.error(`=== QUERY RESOURCE ERROR: ${error.message} ===`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`=== QUERY RESOURCE ERROR: ${errorMessage} ===`);
     return {
       contents: [{
         uri: uri.href,
         text: JSON.stringify({
-          error: `Error executing query: ${error.message}`,
+          error: `Error executing query: ${errorMessage}`,
         }),
       }],
       error: true,

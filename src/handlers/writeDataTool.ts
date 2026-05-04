@@ -1,4 +1,4 @@
-import { INFLUXDB_TOKEN, INFLUXDB_URL } from "../config/env";
+import { influxRequest } from "../utils/influxClient";
 
 interface WriteDataArgs {
   org: string;
@@ -7,7 +7,10 @@ interface WriteDataArgs {
   precision?: string;
 }
 
-// Tool: Write Data
+/**
+ * Tool: Write Data
+ * Writes line protocol data to a specific InfluxDB bucket.
+ */
 export async function writeData({ org, bucket, data, precision }: WriteDataArgs) {
   // Add extremely clear logging
   console.log(`=== WRITE-DATA TOOL CALLED ===`);
@@ -22,26 +25,15 @@ export async function writeData({ org, bucket, data, precision }: WriteDataArgs)
       endpoint += `&precision=${precision}`;
     }
 
-    console.log(`Write URL: ${INFLUXDB_URL}${endpoint}`);
-
-    // Use fetch directly
-    const response = await fetch(`${INFLUXDB_URL}${endpoint}`, {
+    const response = await influxRequest(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
-        "Authorization": `Token ${INFLUXDB_TOKEN}`,
       },
       body: data,
     });
 
     console.log(`Write response status: ${response.status}`);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to write data: ${response.status} ${errorText}`,
-      );
-    }
 
     console.log(`=== WRITE-DATA TOOL COMPLETED SUCCESSFULLY ===`);
     return {
@@ -50,12 +42,13 @@ export async function writeData({ org, bucket, data, precision }: WriteDataArgs)
         text: "Data written successfully",
       }],
     };
-  } catch (error: any) {
-    console.error(`=== WRITE-DATA TOOL ERROR: ${error.message} ===`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`=== WRITE-DATA TOOL ERROR: ${errorMessage} ===`);
     return {
       content: [{
         type: "text" as const,
-        text: `Error writing data: ${error.message}`,
+        text: `Error writing data: ${errorMessage}`,
       }],
       isError: true,
     };

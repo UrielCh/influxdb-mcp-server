@@ -5,33 +5,37 @@ interface CreateOrgArgs {
   description?: string;
 }
 
-// Tool: Create Organization
+/**
+ * Tool: Create Organization
+ * Creates a new organization in InfluxDB.
+ */
 export async function createOrg({ name, description }: CreateOrgArgs) {
-  try {
-    const orgData = {
-      name,
-      description,
-    };
+  console.log(`=== CREATE-ORG TOOL CALLED ===`);
+  console.log(`Creating organization: ${name}`);
 
+  try {
     const response = await influxRequest("/api/v2/orgs", {
       method: "POST",
-      body: JSON.stringify(orgData),
+      body: JSON.stringify({ name, description }),
     });
 
-    const org = await response.json() as any;
+    console.log(`Create org response status: ${response.status}`);
+    const result = await response.json();
 
+    console.log(`=== CREATE-ORG TOOL COMPLETED SUCCESSFULLY ===`);
     return {
       content: [{
         type: "text" as const,
-        text:
-          `Organization created successfully:\nID: ${org.id}\nName: ${org.name}\nDescription: ${org.description || "N/A"}`,
+        text: `Organization '${name}' created successfully (ID: ${result.id})`,
       }],
     };
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`=== CREATE-ORG TOOL ERROR: ${errorMessage} ===`);
     return {
       content: [{
         type: "text" as const,
-        text: `Error creating organization: ${error.message}`,
+        text: `Error creating organization: ${errorMessage}`,
       }],
       isError: true,
     };
